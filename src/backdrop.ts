@@ -28,7 +28,7 @@ const PENA_MASCARA = 1 / 500;  // pena da silhueta: a máscara vem de uma foto m
 const PENA_PINCEL = 1 / 90;    // borda macia do traço: sombra não tem contorno de caneta
 const SUAVE_SOMBRA = 1 / 220; // raio que tira o grão da sombra sem mexer na forma dela
 const ALFA_PRODUTO = 0.22;   // acima disto a mascara ja conta como produto, e nada ali e tocado
-const SOMBRA_ALCANCE = 0.06; // a sombra so vale ate 12% do lado maior em volta da caixa do produto
+const SOMBRA_ALCANCE = 0.26; // até onde a sombra ainda vale, em fração do lado maior, caindo macio
 const VIZINHA = 0.04;        // o quanto uma peça pode estar longe da caixa do produto e ainda ser dele
 
 export interface BackdropResult {
@@ -405,25 +405,19 @@ export async function smoothBackdrop(
   for (let i = 0; i < n; i++) forca[i] = Math.max(suave ? suave[i] : marca[i], pincel ? (pincel[i] > 0.02 ? 1 : 0) : 0);
   if (!suave) blurMascarado(forca, um, w, h, pena); // a máscara do Estúdio já vem com a borda macia
 
-  // A sombra do produto cai perto dele. Longe disso, escuro no fundo é outra coisa — quina de móvel,
-  // rodapé, pessoa passando — e vira branco: o Multiply sozinho guardaria qualquer mancha escura.
-  let px0 = w, py0 = h, px1 = 0, py1 = 0;
-  for (let i = 0; i < n; i++) {
-    if (marca[i]) continue;
-    const x = i % w, y = (i / w) | 0;
-    if (x < px0) px0 = x; if (x > px1) px1 = x;
-    if (y < py0) py0 = y; if (y > py1) py1 = y;
-  }
-  const alcance = Math.round(Math.max(w, h) * SOMBRA_ALCANCE);
-  const temProduto = px1 >= px0;
-  const pertoDoProduto = (i: number) => {
-    if (!temProduto) return true;
-    const x = i % w, y = (i / w) | 0;
-    // Sombra de estudio cai no chao: fica da metade do produto para baixo. Mancha clara solta na
-    // altura do produto e outra coisa (reflexo na parede, objeto fora de quadro) e vai ao branco.
-    const meio = (py0 + py1) / 2;
-    return x >= px0 - alcance && x <= px1 + alcance && y >= meio && y <= py1 + alcance;
-  };
+  // Quanto a sombra ainda vale, conforme se afasta do produto.
+  //
+  // Antes isto era uma caixa: a sombra sobrevivia dentro do retângulo do produto com uma folga, e
+  // morria de uma vez na borda dele. Numa sombra longa — sol baixo, luz rasante — o resultado era
+  // a sombra cortada com uma régua, que é pior do que não ter sombra. Agora o produto é borrado
+  // num campo que cai com a distância: perto vale inteira, longe some sozinha, sem nenhuma reta.
+  const vizinhanca = new Float32Array(n);
+  const umV = new Float32Array(n).fill(1);
+  for (let i = 0; i < n; i++) vizinhanca[i] = marca[i] ? 0 : 1;
+  blurMascarado(vizinhanca, umV, w, h, Math.max(4, Math.round(Math.max(w, h) * SOMBRA_ALCANCE)));
+  // A curva: o campo sai forte colado no produto e cai rápido. A raiz abre a meia-luz, para a
+  // sombra não terminar num degrau onde o campo cruza o limiar.
+  for (let i = 0; i < n; i++) vizinhanca[i] = Math.min(1, Math.sqrt(vizinhanca[i] * 2.2));
 
   // A sombra é decidida num mapa próprio e depois suavizada. Pixel a pixel ela sai granulada e com
   // bloco quadrado, porque a média larga muda de vizinhança de um pixel para o outro; a sombra de
@@ -433,7 +427,7 @@ export async function smoothBackdrop(
   for (let i = 0; i < n; i++) {
     const medido = Math.max(SOMBRA_MIN, Math.min(1, luz[i] / base[i]));
     const pintado = pincel ? pincel[i] : 0;
-    let f = medido > 1 - RUGA || !pertoDoProduto(i) ? 1 : medido;
+    let f = medido > 1 - RUGA ? 1 : 1 - (1 - medido) * vizinhanca[i];
     if (pintado > 0.02) f = Math.min(f, 1 - pintado * (1 - medido));
     fatores[i] = f;
   }

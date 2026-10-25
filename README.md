@@ -137,6 +137,41 @@ Two optional brushes exist because no model is right every time:
 `web/` holds the React page these screenshots come from: a drag-and-drop stage with a before/after
 curtain, both brushes, light and dark themes.
 
+## Training our own weights
+
+The product matte comes from [BiRefNet](https://github.com/ZhengPeng7/BiRefNet), and it should:
+segmenting the subject is a solved problem, and no single machine is going to beat weights trained
+on DIS5K with a cluster. Competing there would be vanity.
+
+The weights worth training are for the question nobody else asks. `training/train_shadow.py`
+trains a **shadow matting** network: for every background pixel, *how much did the object darken
+the backdrop here* — a continuous factor in [0, 1], not a binary mask. Every public shadow dataset
+but one ships binary masks, which throws away the very thing that makes a shadow look real.
+[ISTD](https://github.com/DeepInsight-PCALab/ST-CGAN) ships the shadow-free version of each frame,
+so the factor is directly computable as `shadow / shadow_free`, per pixel.
+
+```bash
+python training/train_shadow.py --data /path/to/ISTD --epochs 40 --batch 8
+python training/export_onnx.py runs/shadow-best.pt server/modelos/shadow-matte.onnx
+```
+
+The network is a deliberately small U-Net (1.9M parameters). A shadow is a low-frequency field: a
+deep decoder spends its capacity inventing grain that is then multiplied into the photo, where it
+shows immediately. The loss is L1 over the pixels where the ratio is meaningful, plus a gradient
+term — matching the derivative is what keeps the penumbra landing in the right place instead of
+becoming a blurred blob.
+
+Honest about cost: roughly 6 hours on one RTX 3090 for 40 epochs at 384x384. On a laptop CPU it is
+weeks, and the script says so before it starts.
+
+**Why a network beats the arithmetic.** The analytic method in `src/backdrop.ts` divides the
+background by the light it would have had. That holds on a plain seamless sweep and nowhere else.
+It has no answer for a textured or coloured backdrop (dividing out the light also divides out the
+texture), for a shadow that leaves the floor and climbs a wall (the reference light jumps), for two
+lights casting two shadows of different densities, or for a translucent object where part of the
+darkening is transmission rather than occlusion. Those are the cases where the factor map has to be
+predicted instead of measured.
+
 ## Tuning
 
 Every constant lives at the top of `src/backdrop.ts` with the reason it has that value:
