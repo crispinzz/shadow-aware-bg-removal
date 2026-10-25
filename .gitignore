@@ -1,0 +1,12 @@
+# Segmentation weights: 224 MB, fetched by server/baixar_modelo.py
+server/modelos/
+__pycache__/
+.venv/
+.pytest_cache/
+.temp/
+node_modules/
+photos/
+web/.cert/
+dist/
+examples/
+docs/figures/

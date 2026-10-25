@@ -1,0 +1,463 @@
+/* Realçador de fotos — interface própria, sem ligação com nenhuma marca.
+   Desenho: trilho de ícones à esquerda, barra com busca no topo e uma tela cinza arredondada onde
+   os blocos brancos vivem. Claro por padrão, escuro quando o sistema pede. */
+
+.rt {
+  --rt-pagina: #ffffff;
+  --rt-tela: #f1f1f1;
+  --rt-cartao: #ffffff;
+  --rt-tinta: #101114;
+  --rt-fraca: #8b8f97;
+  --rt-linha: #e7e7ea;
+  --rt-destaque: #6c6cff;
+  --rt-ruim: #d92d20;
+  --rt-sombra: 0 1px 2px rgba(16, 17, 20, .04), 0 10px 30px -22px rgba(16, 17, 20, .5);
+
+  display: flex;
+  min-height: 100dvh;
+  background: var(--rt-pagina);
+  color: var(--rt-tinta);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* O tema e escolhido no trilho e guardado no navegador; o sistema so decide a primeira visita. */
+.rt[data-tema="escuro"] {
+  --rt-pagina: #0c0d10;
+  --rt-tela: #15171b;
+  --rt-cartao: #1b1e23;
+  --rt-tinta: #f3f4f6;
+  --rt-fraca: #9aa0a9;
+  --rt-linha: #262a30;
+  --rt-sombra: 0 1px 2px rgba(0, 0, 0, .5), 0 18px 44px -26px #000;
+}
+
+.rt button, .rt input, .rt select { font: inherit; color: inherit; }
+
+/* ------------------------------------------------------------------ trilho de ícones */
+.rt-rail {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100dvh;
+  width: 76px;
+  flex: 0 0 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  padding: 22px 0;
+  background: var(--rt-pagina);
+}
+.rt-marca { width: 40px; height: 13px; fill: var(--rt-tinta); }
+.rt-rail nav { display: flex; flex-direction: column; gap: 10px; margin-top: 44px; }
+.rt-rail-fim { margin-top: auto; }
+
+.rt-rail-item {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  color: var(--rt-fraca);
+  cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.rt-rail-item:hover:not(:disabled) { background: var(--rt-tela); color: var(--rt-tinta); }
+.rt-rail-item.is-on { color: var(--rt-tinta); }
+.rt-rail-item:disabled { opacity: .35; cursor: default; }
+.rt-vivo { color: #16a34a; }
+
+/* ------------------------------------------------------------------ topo */
+.rt-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.rt-topo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 26px 10px 0;
+}
+
+.rt-busca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(430px, 46vw);
+  padding: 11px 16px;
+  border: 1px solid var(--rt-linha);
+  border-radius: 999px;
+  background: var(--rt-cartao);
+  color: var(--rt-fraca);
+}
+.rt-busca input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 13.5px; }
+.rt-busca input::placeholder { color: var(--rt-fraca); }
+.rt-busca button { display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 999px; background: var(--rt-tela); cursor: pointer; }
+
+.rt-topo-dir { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+.rt-topo-dir select {
+  appearance: none;
+  padding: 10px 34px 10px 16px;
+  border: 1px solid var(--rt-linha);
+  border-radius: 999px;
+  background: var(--rt-cartao) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5 6 8l3-3.5' fill='none' stroke='%238b8f97' stroke-width='1.6' stroke-linecap='round'/></svg>") no-repeat right 14px center;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rt-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border: 1px solid var(--rt-linha);
+  border-radius: 999px;
+  background: var(--rt-cartao);
+  font-size: 13px;
+  font-weight: 550;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform .12s ease, border-color .12s ease, filter .12s ease;
+}
+.rt-botao:hover:not(:disabled) { transform: translateY(-1px); border-color: color-mix(in srgb, var(--rt-destaque) 45%, var(--rt-linha)); }
+.rt-botao:disabled { opacity: .5; cursor: default; }
+.rt-botao--principal {
+  border-color: transparent;
+  background: var(--rt-destaque);
+  color: #fff;
+  box-shadow: 0 10px 22px -12px var(--rt-destaque);
+}
+.rt-botao--principal:hover:not(:disabled) { filter: brightness(1.07); border-color: transparent; }
+
+.rt-redondo {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--rt-linha);
+  border-radius: 999px;
+  background: var(--rt-cartao);
+  color: var(--rt-tinta);
+  cursor: pointer;
+  transition: background .14s ease;
+}
+.rt-redondo:hover { background: var(--rt-tela); }
+
+/* ------------------------------------------------------------------ tela cinza */
+.rt-tela {
+  flex: 1;
+  display: grid;
+  gap: 26px;
+  align-content: start;
+  margin: 0 0 0 0;
+  padding: 26px clamp(16px, 2vw, 26px) 30px;
+  border-radius: 28px 0 0 0;
+  background: var(--rt-tela);
+}
+
+.rt-bloco { display: grid; gap: 14px; }
+
+.rt-bloco-topo { display: flex; align-items: baseline; gap: 12px; padding: 0 4px; }
+.rt-bloco-topo h2 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: -.025em; }
+.rt-bloco-topo span { color: var(--rt-fraca); font-size: 13px; }
+.rt-bloco-acoes { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+/* ------------------------------------------------------------------ palco */
+.rt-palco {
+  padding: 14px;
+  border-radius: 20px;
+  background: var(--rt-cartao);
+  box-shadow: var(--rt-sombra);
+}
+
+.rt-cortina {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--rt-tela);
+  touch-action: none;
+  user-select: none;
+  cursor: ew-resize;
+}
+.rt-cortina img { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: contain; }
+.rt-cortina-topo { position: absolute; inset: 0; overflow: hidden; }
+.rt-cortina-topo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.rt-cortina-linha { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .15); }
+.rt-cortina-alca {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 38px;
+  height: 38px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, .55);
+}
+.rt-cortina-alca::before, .rt-cortina-alca::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  transform: translateY(-50%);
+}
+.rt-cortina-alca::before { left: 7px; border-right-color: #101114; }
+.rt-cortina-alca::after { right: 7px; border-left-color: #101114; }
+
+.rt-cortina-marca {
+  position: absolute;
+  top: 12px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(16, 17, 20, .6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
+}
+.rt-cortina-marca--antes { left: 12px; }
+.rt-cortina-marca--depois { right: 12px; }
+
+.rt-cortina--so { cursor: default; }
+.rt-cortina-brilho {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 38%, color-mix(in srgb, var(--rt-destaque) 26%, transparent) 50%, transparent 62%);
+  background-size: 260% 100%;
+  animation: rt-varre 1.25s linear infinite;
+}
+@keyframes rt-varre { from { background-position: 180% 0; } to { background-position: -60% 0; } }
+
+.rt-etapa {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(16, 17, 20, .74);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+}
+
+/* ------------------------------------------------------------------ ficha do resultado */
+.rt-ficha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+.rt-ficha div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--rt-cartao);
+  box-shadow: var(--rt-sombra);
+}
+.rt-ficha span { color: var(--rt-fraca); font-size: 11.5px; }
+.rt-ficha b { font-size: 15px; font-weight: 620; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+
+.rt-erro {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--rt-ruim) 12%, var(--rt-cartao));
+  color: var(--rt-ruim);
+  font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ trilho de fotos */
+.rt-trilho {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 2px 4px 8px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.rt-trilho::-webkit-scrollbar { display: none; }
+.rt-trilho > li { flex: 0 0 auto; scroll-snap-align: start; }
+
+.rt-card {
+  display: grid;
+  gap: 0;
+  width: 196px;
+  padding: 10px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--rt-cartao);
+  box-shadow: var(--rt-sombra);
+  text-align: left;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.rt-card:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 1px 2px rgba(16, 17, 20, .05), 0 22px 40px -26px rgba(16, 17, 20, .75); }
+.rt-card:disabled { opacity: .55; cursor: default; }
+.rt-card img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 12px; background: var(--rt-tela); }
+.rt-card-pe { display: flex; align-items: baseline; gap: 8px; padding: 10px 4px 2px; }
+.rt-card-pe b { font-size: 13.5px; font-weight: 600; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-card-pe span { margin-left: auto; color: var(--rt-fraca); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.rt-card--qr { cursor: default; }
+.rt-card--qr img { object-fit: contain; padding: 14px; background: #fff; }
+
+/* ------------------------------------------------------------------ vazio */
+.rt-zero {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: clamp(40px, 10vh, 96px) 24px;
+  text-align: center;
+}
+.rt-zero b { font-size: 16px; font-weight: 620; letter-spacing: -.015em; }
+.rt-zero p { margin: 0; max-width: 44ch; color: var(--rt-fraca); font-size: 13px; line-height: 1.55; }
+.rt-zero code { padding: 2px 6px; border-radius: 6px; background: var(--rt-tela); font-size: 12px; }
+.rt-zero .rt-botao { margin-top: 6px; }
+
+/* ------------------------------------------------------------------ pincel */
+.rt-pincel { display: grid; gap: 12px; }
+.rt-pincel-palco { position: relative; border-radius: 14px; overflow: hidden; background: var(--rt-tela); }
+.rt-pincel-palco img { display: block; width: 100%; height: auto; max-height: 58vh; object-fit: contain; }
+.rt-pincel-palco canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+.rt-barra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 2px; }
+.rt-range { display: flex; align-items: center; gap: 10px; color: var(--rt-fraca); font-size: 12.5px; }
+.rt-range input { width: 170px; accent-color: var(--rt-destaque); }
+.rt-barra .rt-botao--principal { margin-left: auto; }
+.rt-dica { margin: 0 2px; color: var(--rt-fraca); font-size: 12.5px; }
+
+/* ------------------------------------------------------------------ arrastar */
+.rt-solte {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--rt-pagina) 74%, transparent);
+  backdrop-filter: blur(6px);
+}
+.rt-solte span {
+  padding: 18px 30px;
+  border: 2px dashed var(--rt-destaque);
+  border-radius: 20px;
+  background: var(--rt-cartao);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .rt-rail { width: 60px; flex-basis: 60px; }
+  .rt-busca { width: auto; flex: 1; }
+  .rt-tela { border-radius: 22px 0 0 0; }
+}
+
+
+/* ==================================================================== animação
+   Nada decorativo: cada movimento diz uma coisa. Quem não quer movimento desliga no sistema,
+   e a última regra deste arquivo respeita isso. */
+
+.rt, .rt * { transition-property: background-color, border-color, color, fill; transition-duration: .22s; }
+
+/* Os cartões entram em cascata quando a lista chega, para o olho seguir a ordem das fotos. */
+@keyframes rt-sobe { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.rt-trilho > li { animation: rt-sobe .42s cubic-bezier(.22, .8, .3, 1) backwards; }
+.rt-trilho > li:nth-child(1) { animation-delay: .02s; }
+.rt-trilho > li:nth-child(2) { animation-delay: .07s; }
+.rt-trilho > li:nth-child(3) { animation-delay: .12s; }
+.rt-trilho > li:nth-child(4) { animation-delay: .17s; }
+.rt-trilho > li:nth-child(5) { animation-delay: .22s; }
+.rt-trilho > li:nth-child(n+6) { animation-delay: .26s; }
+
+/* O resultado chega com a ficha de números subindo atrás da foto. */
+.rt-ficha div { animation: rt-sobe .4s cubic-bezier(.22, .8, .3, 1) backwards; }
+.rt-ficha div:nth-child(2) { animation-delay: .05s; }
+.rt-ficha div:nth-child(3) { animation-delay: .1s; }
+.rt-ficha div:nth-child(4) { animation-delay: .15s; }
+
+/* A cortina abre sozinha uma vez, mostrando que ela se arrasta. */
+@keyframes rt-abre { from { width: 100%; } to { width: 50%; } }
+.rt-cortina-topo { animation: rt-abre .9s .15s cubic-bezier(.65, 0, .35, 1) backwards; }
+
+/* O ponto verde do servidor pulsa como um sinal de rádio, que é o que ele é. */
+@keyframes rt-pulso { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.rt-vivo { animation: rt-pulso 2.4s ease-in-out infinite; }
+
+/* ==================================================================== estados vazios
+   Cada tela sem conteúdo mostra o que ela vai fazer, em vez de uma frase triste. */
+.rt-zero { position: relative; overflow: hidden; }
+
+/* Desenho do estúdio: um fundo, um produto e a sombra, montados em CSS e respirando devagar. */
+.rt-zero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 50% at 50% 46%, color-mix(in srgb, var(--rt-destaque) 7%, transparent), transparent 70%);
+  animation: rt-respira 6s ease-in-out infinite;
+}
+@keyframes rt-respira { 0%, 100% { opacity: .6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.06); } }
+
+.rt-palco .rt-zero b, .rt-palco .rt-zero p { position: relative; }
+
+/* A peça que gira no vazio do palco: mostra o fundo infinito virando branco. */
+.rt-palco .rt-zero::after {
+  content: "";
+  position: relative;
+  order: -1;
+  width: 128px;
+  height: 92px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--rt-tinta) 10%, transparent), transparent 58%),
+    repeating-linear-gradient(104deg,
+      color-mix(in srgb, var(--rt-tinta) 7%, transparent) 0 7px,
+      transparent 7px 17px),
+    var(--rt-cartao);
+  box-shadow: inset 0 0 0 1px var(--rt-linha);
+  animation: rt-limpa 5.2s ease-in-out infinite;
+}
+@keyframes rt-limpa {
+  0%, 18% { background-size: 100% 100%, 100% 100%, 100% 100%; filter: none; }
+  52%, 72% { filter: contrast(.12) brightness(1.5); }
+  100% { filter: none; }
+}
+
+/* Cursor fantasma: uma bolinha que varre o quadro, como o pincel faria. */
+.rt-palco .rt-zero b::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -58px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rt-destaque) 70%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--rt-destaque) 14%, transparent);
+  animation: rt-varrinha 5.2s ease-in-out infinite;
+}
+@keyframes rt-varrinha {
+  0%, 14% { transform: translate(-70px, 24px) scale(.6); opacity: 0; }
+  22% { opacity: 1; }
+  50% { transform: translate(52px, -4px) scale(1); opacity: 1; }
+  66% { transform: translate(-36px, 10px) scale(.9); opacity: .9; }
+  80%, 100% { transform: translate(60px, 20px) scale(.6); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rt *, .rt *::before, .rt *::after { animation: none !important; transition: none !important; }
+}
+
+/* O pincel muda de cor conforme o que ele faz: azul guarda a sombra, vermelho apaga objeto. */
+.rt-pincel[data-modo="apagar"] .rt-pincel-palco { box-shadow: inset 0 0 0 2px color-mix(in srgb, #ff4646 55%, transparent); }
+.rt-pincel[data-modo="sombra"] .rt-pincel-palco { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rt-destaque) 55%, transparent); }
+body { margin: 0; }
