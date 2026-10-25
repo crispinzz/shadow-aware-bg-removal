@@ -161,8 +161,18 @@ shows immediately. The loss is L1 over the pixels where the ratio is meaningful,
 term — matching the derivative is what keeps the penumbra landing in the right place instead of
 becoming a blurred blob.
 
-Honest about cost: roughly 6 hours on one RTX 3090 for 40 epochs at 384x384. On a laptop CPU it is
-weeks, and the script says so before it starts.
+Honest about cost, measured rather than guessed. `training/bench_cpu.py` times a real training
+step on your machine; on an Intel i5-13400 with no GPU at all it prints:
+
+| side | batch | s/step | 40 epochs on ISTD |
+|---|---|---|---|
+| 256 px | 4 | 1.6 s | 6 h |
+| 320 px | 4 | 2.9 s | 11 h |
+| 384 px | 4 | 4.3 s | 16 h |
+
+A plain desktop CPU trains this overnight, and peak memory stays near 1.5 GB at 320 px. That is
+the payoff for keeping the network small: no GPU, no cloud bill, no CUDA. Fine-tuning a subject
+segmenter is the opposite — that one belongs on a rented GPU.
 
 **Why a network beats the arithmetic.** The analytic method in `src/backdrop.ts` divides the
 background by the light it would have had. That holds on a plain seamless sweep and nowhere else.

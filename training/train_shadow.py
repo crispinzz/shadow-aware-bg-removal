@@ -29,8 +29,16 @@ which is exactly the information this project refuses to settle for.
     python training/train_shadow.py --data /path/to/ISTD --epochs 40 --batch 8
     python training/export_onnx.py runs/shadow-best.pt server/modelos/shadow-matte.onnx
 
-Honest numbers: on one RTX 3090 this is about 6 hours for 40 epochs at 384x384. On a laptop CPU it
-is not days, it is weeks — do not start it there. Nothing in this file pretends otherwise.
+Honest numbers, measured by training/bench_cpu.py and not guessed. On an Intel i5-13400 (10 worker
+threads, no CUDA), one forward+backward+step of this network:
+
+    256 px, batch 4   1.6 s/step    6 h for 40 epochs on ISTD
+    320 px, batch 4   2.9 s/step   11 h
+    384 px, batch 4   4.3 s/step   16 h
+
+So a plain desktop CPU trains this overnight. That is only true because the network is small on
+purpose; fine-tuning a subject segmenter like BiRefNet on the same machine is not in the same
+universe and should go to a rented GPU. Run bench_cpu.py on your own machine before planning.
 """
 from __future__ import annotations
 
@@ -49,7 +57,15 @@ except ImportError as erro:  # pragma: no cover - the message is the point
     raise SystemExit("pip install opencv-python torch") from erro
 
 
-LADO = 384
+LADO = 320  # training side; 256 halves the time, 384 buys little on a signal this smooth
+
+
+def tamanho_do_lado(lado: int | None = None) -> int:
+    """The side every image is resized to. Overridable from the command line."""
+    global LADO
+    if lado:
+        LADO = lado
+    return LADO
 
 
 class IstdFactors(Dataset):
@@ -146,15 +162,25 @@ def main() -> None:
     p.add_argument("--batch", type=int, default=8)
     p.add_argument("--lr", type=float, default=2e-4)
     p.add_argument("--out", type=Path, default=Path("runs"))
+    p.add_argument("--size", type=int, default=LADO, help="training side in pixels")
+    p.add_argument("--threads", type=int, default=0, help="0 keeps torch's own choice")
     args = p.parse_args()
 
+    tamanho_do_lado(args.size)
+    if args.threads:
+        torch.set_num_threads(args.threads)
     dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
     if dispositivo == "cpu":
-        print("WARNING: no CUDA device. This will take weeks, not hours. Stop now.")
+        # Overnight, not impossible: see the measured table at the top of this file. Peak RSS is
+        # roughly 1.5 GB at 320 px batch 4, so close the browser before starting.
+        print(f"no CUDA: training on CPU with {torch.get_num_threads()} threads at {LADO} px. "
+              "Run training/bench_cpu.py to see what that costs here.")
 
+    # Workers hold their own copy of each batch; on a 16 GB machine that is the first thing to cut.
+    trabalhadores = 2 if dispositivo == "cpu" else 4
     treino = DataLoader(IstdFactors(args.data, "train"), batch_size=args.batch, shuffle=True,
-                        num_workers=4, drop_last=True)
-    teste = DataLoader(IstdFactors(args.data, "test"), batch_size=args.batch, num_workers=2)
+                        num_workers=trabalhadores, drop_last=True)
+    teste = DataLoader(IstdFactors(args.data, "test"), batch_size=args.batch, num_workers=1)
 
     rede = ShadowMatte().to(dispositivo)
     otim = torch.optim.AdamW(rede.parameters(), lr=args.lr, weight_decay=1e-4)
