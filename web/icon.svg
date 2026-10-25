@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#101114"/>
+  <!-- Um objeto e a sombra que ele mantem: e o que a ferramenta faz. -->
+  <ellipse cx="36" cy="46" rx="18" ry="5" fill="#6c6cff" opacity=".45"/>
+  <circle cx="30" cy="28" r="13" fill="#fff"/>
+  <path d="M30 15a13 13 0 0 0 0 26z" fill="#c9c9d4"/>
+</svg>

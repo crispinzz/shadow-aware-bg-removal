@@ -22,8 +22,10 @@ const CERCA = 1 / 300;       // quanto a silhueta empurra o fundo para longe, em
 const RAIO_LUZ = 1 / 22;     // raio da leitura da luz do fundo, em fração do lado maior
 const PENA = 1 / 400;        // borda da máscara borrada, para o fundo encontrar o produto sem degrau
 const QUALIDADE = 0.95;
-const SOMBRA_MIN = 0.55;     // a sombra não escurece além disto: abaixo seria buraco, não sombra
+const SOMBRA_MIN = 0.62;     // a sombra não escurece além disto: abaixo seria buraco, não sombra
 const RUGA = 0.18;           // ate 18% mais escuro que o fundo liso e dobra de tecido, e vira branco
+const PENA_MASCARA = 1 / 500;  // pena da silhueta: a máscara vem de uma foto menor e sobe em degrau
+const PENA_PINCEL = 1 / 90;    // borda macia do traço: sombra não tem contorno de caneta
 const SUAVE_SOMBRA = 1 / 220; // raio que tira o grão da sombra sem mexer na forma dela
 const ALFA_PRODUTO = 0.22;   // acima disto a mascara ja conta como produto, e nada ali e tocado
 const SOMBRA_ALCANCE = 0.06; // a sombra so vale ate 12% do lado maior em volta da caixa do produto
@@ -323,6 +325,11 @@ export async function smoothBackdrop(
     }
     const macio = suave;
     fecharFuros(marca, luz, w, h, (i) => { macio[i] = 0; });
+    // A máscara foi calculada numa foto menor e ampliada até aqui: a silhueta chega em degrau de
+    // vários pixels. Sem esta pena, o contorno do produto sai serrilhado contra o branco.
+    const degrau = Math.max(1, Math.round(Math.max(w, h) * PENA_MASCARA));
+    const umM = new Float32Array(n).fill(1);
+    blurMascarado(macio, umM, w, h, degrau);
     soMaiorPeca(marca, w, h, (i) => { macio[i] = 1; });
   } else {
     mascaraDoFundo(luz, w, h).forEach((v, i) => { marca[i] = v; });
@@ -357,6 +364,18 @@ export async function smoothBackdrop(
     let algum = 0;
     for (let i = 0; i < n; i++) { const a = dados[i * 4 + 3] / 255; pincel[i] = a; algum += a > 0.02 ? 1 : 0; }
     if (!algum) pincel = null;
+    // Borda macia no traço: sombra não tem contorno de caneta. O raio acompanha o tamanho da foto,
+    // então o mesmo traço vale igual em 1 MP e em 12 MP.
+    if (pincel) {
+      const umP = new Float32Array(n).fill(1);
+      blurMascarado(pincel, umP, w, h, Math.max(2, Math.round(Math.max(w, h) * PENA_PINCEL)));
+    }
+    // Traço pequeno demais é toque sem querer, e viraria uma mancha escura solta.
+    if (pincel) {
+      let area = 0;
+      for (let i = 0; i < n; i++) if (pincel[i] > 0.08) area++;
+      if (area < n * 0.002) pincel = null;
+    }
   }
 
   // Quanta luz o fundo teria em cada ponto se a sombra não estivesse lá: média larga tomada só nos
