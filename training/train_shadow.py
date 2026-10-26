@@ -43,6 +43,8 @@ universe and should go to a rented GPU. Run bench_cpu.py on your own machine bef
 from __future__ import annotations
 
 import argparse
+import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -188,6 +190,32 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     melhor = float("inf")
 
+    # Progress file for training/progress.html. Written every few steps so a long run can be
+    # watched without a terminal, and read by anything: it is one small JSON object.
+    progresso = args.out / "progress.json"
+    passos_totais = args.epochs * max(len(treino), 1)
+    comeco = time.time()
+    passo = 0
+
+    def anotar(epoca: int, perda_treino: float, perda_val: float | None) -> None:
+        feito = passo / max(passos_totais, 1)
+        decorrido = time.time() - comeco
+        progresso.write_text(json.dumps({
+            "percent": round(feito * 100, 2),
+            "epoch": epoca + 1,
+            "epochs": args.epochs,
+            "step": passo,
+            "steps": passos_totais,
+            "train_loss": round(perda_treino, 5),
+            "val_loss": round(perda_val, 5) if perda_val is not None else None,
+            "best_val": round(melhor, 5) if melhor < float("inf") else None,
+            "elapsed_s": round(decorrido),
+            "eta_s": round(decorrido / feito - decorrido) if feito > 0.002 else None,
+            "started": comeco,
+            "device": dispositivo,
+            "size": LADO,
+        }), encoding="utf-8")
+
     for epoca in range(args.epochs):
         rede.train()
         soma = 0.0
@@ -198,6 +226,9 @@ def main() -> None:
             erro.backward()
             otim.step()
             soma += erro.item()
+            passo += 1
+            if passo % 5 == 0:
+                anotar(epoca, soma / max(passo - epoca * len(treino), 1), None)
         passos.step()
 
         rede.eval()
@@ -209,6 +240,7 @@ def main() -> None:
         validacao /= max(len(teste), 1)
         print(f"epoch {epoca + 1:3d}/{args.epochs}  train {soma / len(treino):.4f}  val {validacao:.4f}")
 
+        anotar(epoca, soma / len(treino), validacao)
         if validacao < melhor:
             melhor = validacao
             torch.save(rede.state_dict(), args.out / "shadow-best.pt")

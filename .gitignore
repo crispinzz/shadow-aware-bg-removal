@@ -10,3 +10,5 @@ web/.cert/
 dist/
 examples/
 docs/figures/
+data/
+runs/

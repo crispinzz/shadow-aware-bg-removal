@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Treino · Shadow Studio</title>
+<link rel="icon" type="image/svg+xml" href="../web/icon.svg">
+<style>
+  :root { --bg:#fff; --tela:#f1f1f1; --tinta:#101114; --fraca:#8b8f97; --linha:#e7e7ea; --cor:#6c6cff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0c0d10; --tela:#15171b; --tinta:#f3f4f6; --fraca:#9aa0a9; --linha:#262a30; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100dvh; display:grid; place-items:center; padding:24px;
+         background:var(--bg); color:var(--tinta); font:14px Inter,system-ui,sans-serif; }
+  .cartao { width:min(560px,100%); padding:28px; border:1px solid var(--linha); border-radius:22px; background:var(--tela); }
+  h1 { margin:0 0 2px; font-size:19px; font-weight:650; letter-spacing:-.02em; }
+  .sub { margin:0 0 22px; color:var(--fraca); font-size:13px; }
+  .pct { font-size:54px; font-weight:700; letter-spacing:-.04em; font-variant-numeric:tabular-nums; line-height:1; }
+  .trilho { height:10px; margin:14px 0 20px; border-radius:999px; background:var(--linha); overflow:hidden; }
+  .barra { height:100%; width:0; border-radius:999px; background:var(--cor); transition:width .4s ease; }
+  .grade { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .caixa { padding:12px 14px; border-radius:14px; background:var(--bg); border:1px solid var(--linha); }
+  .caixa span { display:block; color:var(--fraca); font-size:11.5px; }
+  .caixa b { font-size:16px; font-weight:620; font-variant-numeric:tabular-nums; }
+  .pe { margin:18px 0 0; color:var(--fraca); font-size:12px; }
+  .off { color:#d92d20; }
+</style>
+</head>
+<body>
+<div class="cartao">
+  <h1>Treino da rede de sombra</h1>
+  <p class="sub" id="sub">procurando runs/progress.json…</p>
+  <div class="pct" id="pct">0%</div>
+  <div class="trilho"><div class="barra" id="barra"></div></div>
+  <div class="grade">
+    <div class="caixa"><span>Época</span><b id="epoca">—</b></div>
+    <div class="caixa"><span>Termina às</span><b id="fim">—</b></div>
+    <div class="caixa"><span>Perda (treino)</span><b id="treino">—</b></div>
+    <div class="caixa"><span>Perda (validação)</span><b id="val">—</b></div>
+  </div>
+  <p class="pe" id="pe">A página se atualiza sozinha a cada 5 s. Pode fechar e voltar quando quiser.</p>
+</div>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const relogio = (s) => new Date(Date.now() + s * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const duracao = (s) => s == null ? "—" : `${Math.floor(s / 3600)}h ${String(Math.round(s % 3600 / 60)).padStart(2, "0")}m`;
+
+  async function ler() {
+    try {
+      // cache-busting: o arquivo muda a cada poucos segundos e o disco é local
+      const r = await fetch(`../runs/progress.json?t=${Date.now()}`);
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      $("pct").textContent = `${d.percent.toFixed(1)}%`;
+      $("barra").style.width = `${d.percent}%`;
+      $("epoca").textContent = `${d.epoch} / ${d.epochs}`;
+      $("fim").textContent = d.eta_s ? `${relogio(d.eta_s)}  (${duracao(d.eta_s)})` : "calculando…";
+      $("treino").textContent = d.train_loss ?? "—";
+      $("val").textContent = d.val_loss ?? "—";
+      $("sub").textContent = `${d.size} px · ${d.device} · passo ${d.step} de ${d.steps} · ${duracao(d.elapsed_s)} rodando`;
+      $("sub").classList.remove("off");
+      if (d.percent >= 100) $("pe").textContent = "Terminou. Os pesos estão em runs/shadow-best.pt.";
+    } catch {
+      $("sub").textContent = "sem runs/progress.json — o treino não está rodando (ou ainda não deu o primeiro passo)";
+      $("sub").classList.add("off");
+    }
+  }
+  ler();
+  setInterval(ler, 5000);
+</script>
+</body>
+</html>
