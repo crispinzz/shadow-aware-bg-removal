@@ -81,20 +81,15 @@ def so_o_produto(fundo: np.ndarray) -> np.ndarray:
     return limpo
 
 
-def perto_do_produto(produto: np.ndarray) -> np.ndarray:
-    """A studio shadow falls on the floor: from the middle of the product downwards, and close by.
+def vizinhanca(produto: np.ndarray) -> np.ndarray:
+    """How close each pixel is to the product: 1 at the product, falling to 0 far away.
 
-    Without this the multiply keeps any dark patch in the frame, not just the shadow.
+    Mirrors src/backdrop.ts. The shadow is scaled by this field instead of being clipped to a box,
+    so a long shadow fades with distance rather than ending on a straight edge.
     """
-    ys, xs = np.where(produto)
-    if not ys.size:
-        return np.ones_like(produto)
-    alcance = int(max(produto.shape) * 0.06)
-    meio = (ys.min() + ys.max()) // 2
-    faixa = np.zeros_like(produto)
-    faixa[meio:min(produto.shape[0], ys.max() + alcance),
-          max(0, xs.min() - alcance):min(produto.shape[1], xs.max() + alcance)] = True
-    return faixa
+    raio = max(4, int(max(produto.shape) * 0.06)) | 1
+    campo = cv2.blur(produto.astype(np.float32), (raio, raio))
+    return np.minimum(1.0, np.sqrt(campo * 2.2))
 
 
 def main(entrada: Path) -> None:
@@ -111,10 +106,12 @@ def main(entrada: Path) -> None:
     fundo = so_o_produto(alfa <= ALFA_PRODUTO)
     base = luz_do_fundo(luz, fundo)
 
-    fator = np.clip(luz / np.maximum(base, 1.0), SOMBRA_MIN, 1.0)
-    fator = np.where(fator > 1 - RUGA, 1.0, fator)          # fabric fold -> white
+    medido = np.clip(luz / np.maximum(base, 1.0), SOMBRA_MIN, 1.0)
+    perto = vizinhanca(~fundo)
+    # Fold -> white; real shadow fades with distance from the product instead of being boxed off.
+    fator = np.where(medido > 1 - RUGA, 1.0, 1.0 - (1.0 - medido) * perto)
     fator = cv2.blur(fator, (7, 7))                          # the shadow has no grain
-    mapa = np.where(fundo & perto_do_produto(~fundo), fator, 1.0)
+    mapa = np.where(fundo, fator, 1.0)
     cv2.imwrite(str(SAIDA / "03-shadow-map.png"), (mapa * 255).astype(np.uint8))
 
     # Composite: white times the shadow factor outside the product, original bytes inside.
