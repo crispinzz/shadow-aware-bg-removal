@@ -28,6 +28,9 @@ export type Saude = {
   modelo_pronto: boolean;
   modelo_carregado: boolean;
   licenca_dos_pesos: string;
+  sombra_rede: string;
+  sombra_rede_pronta: boolean;
+  sombra_rede_ativa: boolean;
   opencv: string;
   trabalhadores: number;
 };

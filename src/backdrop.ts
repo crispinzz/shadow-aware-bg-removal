@@ -31,6 +31,16 @@ const ALFA_PRODUTO = 0.22;   // acima disto a mascara ja conta como produto, e n
 const SOMBRA_ALCANCE = 0.26; // até onde a sombra ainda vale, em fração do lado maior, caindo macio
 const VIZINHA = 0.04;        // o quanto uma peça pode estar longe da caixa do produto e ainda ser dele
 
+export interface BackdropOpts {
+  sombra?: CanvasImageSource;   // traço do pincel da sombra
+  produto?: CanvasImageSource;  // máscara do Estúdio
+  apagar?: CanvasImageSource;   // (legado) traço da borracha
+  /** Fundo da saída: "transparente" (PNG com alfa) ou uma cor RGB (padrão branco). */
+  fundo?: "transparente" | { r: number; g: number; b: number };
+  /** Formato do arquivo quando o fundo é sólido. Transparente é sempre PNG. */
+  formato?: "png" | "jpeg" | "webp";
+}
+
 export interface BackdropResult {
   file: File;
   /** Fração do quadro que foi reconhecida como fundo. Abaixo de 0,1 provavelmente não era estúdio. */
@@ -277,11 +287,12 @@ function mascaraDoFundo(luz: Float32Array, w: number, h: number) {
 export async function smoothBackdrop(
   input: Blob,
   name: string,
-  sombra?: CanvasImageSource,
-  produto?: CanvasImageSource,
-  apagar?: CanvasImageSource,
-  transparente?: boolean,
+  opts: BackdropOpts = {},
 ): Promise<BackdropResult> {
+  const { sombra, produto, apagar } = opts;
+  const transparente = opts.fundo === "transparente";
+  const cor = opts.fundo && typeof opts.fundo === "object" ? opts.fundo : { r: 255, g: 255, b: 255 };
+  const formato: "png" | "jpeg" | "webp" = transparente ? "png" : (opts.formato ?? "jpeg");
   const comeco = performance.now();
   const bitmap = await createImageBitmap(input);
   const escala = Math.min(1, LADO_MAX / Math.max(bitmap.width, bitmap.height));
@@ -450,21 +461,22 @@ export async function smoothBackdrop(
       px[p + 3] = Math.round(255 * cobre);
       continue;
     }
-    // Multiply sobre branco: 1 e branco puro, abaixo de 1 e sombra. A dobra de tecido fica dentro
-    // de RUGA e e arredondada para branco; a sombra passa disso e sobrevive inteira.
-    const alvo = 255 * Math.max(SOMBRA_MIN, Math.min(1, fatores[i]));
-    px[p] = Math.round(px[p] * (1 - t) + alvo * t);
-    px[p + 1] = Math.round(px[p + 1] * (1 - t) + alvo * t);
-    px[p + 2] = Math.round(px[p + 2] * (1 - t) + alvo * t);
+    // Multiply sobre a cor escolhida: fator 1 é a cor pura, abaixo de 1 é sombra. A dobra de tecido
+    // fica dentro de RUGA e é arredondada para a cor; a sombra passa disso e sobrevive inteira.
+    const f = Math.max(SOMBRA_MIN, Math.min(1, fatores[i]));
+    px[p] = Math.round(px[p] * (1 - t) + cor.r * f * t);
+    px[p + 1] = Math.round(px[p + 1] * (1 - t) + cor.g * f * t);
+    px[p + 2] = Math.round(px[p + 2] * (1 - t) + cor.b * f * t);
   }
 
   ctx.putImageData(imagem, 0, 0);
-  const tipo = transparente ? "image/png" : "image/jpeg";
+  const tipo = { png: "image/png", jpeg: "image/jpeg", webp: "image/webp" }[formato];
   const blob = await new Promise<Blob | null>((ok) => tela.toBlob(ok, tipo, QUALIDADE));
   if (!blob) throw new Error("Não consegui gerar a foto tratada.");
-  const sufixo = transparente ? "-fundo-transparente.png" : "-fundo-branco.jpg";
+  const ext = formato === "jpeg" ? "jpg" : formato;
+  const sufixo = transparente ? "-fundo-transparente" : "-fundo";
   return {
-    file: new File([blob], name.replace(/\.\w+$/, "") + sufixo, { type: tipo }),
+    file: new File([blob], name.replace(/\.\w+$/, "") + `${sufixo}.${ext}`, { type: tipo }),
     cobertura: dentro / n,
     w,
     h,
