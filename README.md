@@ -8,7 +8,7 @@ Every product pixel stays **byte-for-byte identical**. The backdrop becomes **pu
 drops out to transparent**. The contact shadow survives with its **real shape and softness**.
 Runs locally — the photo never leaves the machine.
 
-![License](https://img.shields.io/badge/license-MIT-6c6cff)
+![License](https://img.shields.io/badge/license-all%20rights%20reserved-6c6cff)
 ![Runs offline](https://img.shields.io/badge/runs-100%25%20offline-1b1e23)
 ![Python](https://img.shields.io/badge/python-3.11%2B-6c6cff)
 ![ONNX Runtime](https://img.shields.io/badge/engine-ONNX%20Runtime-1b1e23)
@@ -22,7 +22,7 @@ Runs locally — the photo never leaves the machine.
 
 ```
 background removal · keep shadow · product photography · e-commerce · white background
-BiRefNet · ONNX Runtime · alpha matting · FastAPI · TypeScript · offline · MIT
+BiRefNet · ONNX Runtime · alpha matting · FastAPI · TypeScript · offline · proprietary
 ```
 
 ---
@@ -229,8 +229,9 @@ the network reasons at 1024 px anyway.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE). The BiRefNet weights are MIT as well, from
-[ZhengPeng7/BiRefNet](https://github.com/ZhengPeng7/BiRefNet).
+All rights reserved — see [LICENSE](LICENSE). This project is proprietary; no use or
+redistribution without written consent. The BiRefNet weights are MIT, from
+[ZhengPeng7/BiRefNet](https://github.com/ZhengPeng7/BiRefNet), and keep their own licence.
 
 ---
 
