@@ -405,10 +405,13 @@ export default function StudioPage() {
       const mascara = trabalho.arquivos.mascara;
       if (!mascara) throw new Error("O Estúdio terminou sem a máscara do produto.");
       const desenho = await carregarImagem(arquivoUrl(mascara.id));
+      // Mapa de fator da rede SHARP, quando o server o devolve: a sombra vem da rede, não do analítico.
+      const arqFator = trabalho.arquivos.fator;
+      const fatorRede = arqFator ? await carregarImagem(arquivoUrl(arqFator.id)) : undefined;
       setEtapa("Montando o fundo…");
       const f = fundoRef.current;
       const alvoFundo: BackdropOpts["fundo"] = f === "transparente" ? "transparente" : f === "cor" ? hexParaRgb(corRef.current) : { r: 255, g: 255, b: 255 };
-      const res = await smoothBackdrop(file, file.name, { sombra: marcas.current.sombra, produto: desenho, fundo: alvoFundo, formato: formatoRef.current });
+      const res = await smoothBackdrop(file, file.name, { sombra: marcas.current.sombra, produto: desenho, fator: fatorRede, fundo: alvoFundo, formato: formatoRef.current });
       setDepois({ url: URL.createObjectURL(res.file), nome: res.file.name, cobertura: res.cobertura, ms: res.ms, w: res.w, h: res.h });
       const item: FotoLocal = {
         id: crypto.randomUUID(), nome: titulo, ts: Date.now(),

@@ -61,3 +61,8 @@ def gravar_mascara(alfa: np.ndarray, pasta: Path, base: str) -> Path:
     Image.fromarray(cinza, mode="L").save(caminho, format="PNG", optimize=True)
     _conferir(caminho, largura, altura)
     return caminho
+
+
+def gravar_fator(fator: np.ndarray, pasta: Path, base: str) -> Path:
+    """Grava o mapa de fator da sombra (0..1) como PNG em cinza. O frontend compõe com ele."""
+    return gravar_mascara(fator, pasta, base)

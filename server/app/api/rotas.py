@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 
 from ..core import config
 from ..core.trabalhos import Estado, fila
-from ..vision import entrada, modelo, pipeline
+from ..vision import entrada, pipeline, sombra_rede
 
 rotas = APIRouter(prefix="/api")
 
@@ -21,11 +21,11 @@ def health() -> dict:
     return {
         "ok": True,
         **pipeline.metadados_do_motor(),
-        # Rede de sombra própria (SHARP). O peso pode estar instalado sem estar ligado ao pipeline:
-        # a composição da sombra hoje é analítica (src/backdrop.ts), por isso "ativa" é separado.
-        "sombra_rede": "shadow-matte",
-        "sombra_rede_pronta": (modelo.PASTA / "shadow-matte.onnx").exists(),
-        "sombra_rede_ativa": False,
+        # Rede de sombra própria (SHARP). Quando o peso está instalado, o pipeline já devolve o mapa
+        # de fator dela e a composição usa esse mapa (src/backdrop.ts); por isso ativa = pronta.
+        "sombra_rede": sombra_rede.NOME,
+        "sombra_rede_pronta": sombra_rede.pronto(),
+        "sombra_rede_ativa": sombra_rede.pronto(),
         "limites": {
             "max_bytes": config.MAX_BYTES,
             "max_pixels": config.MAX_PIXELS,

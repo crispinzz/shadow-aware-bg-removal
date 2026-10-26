@@ -35,6 +35,9 @@ export interface BackdropOpts {
   sombra?: CanvasImageSource;   // traço do pincel da sombra
   produto?: CanvasImageSource;  // máscara do Estúdio
   apagar?: CanvasImageSource;   // (legado) traço da borracha
+  /** Mapa de fator da sombra pela rede SHARP (cinza 0..1). Com ele, a sombra vem da rede, não da
+   *  conta analítica. Sem ele, a divisão pela luz do fundo continua valendo. */
+  fator?: CanvasImageSource;
   /** Fundo da saída: "transparente" (PNG com alfa) ou uma cor RGB (padrão branco). */
   fundo?: "transparente" | { r: number; g: number; b: number };
   /** Formato do arquivo quando o fundo é sólido. Transparente é sempre PNG. */
@@ -284,12 +287,24 @@ function mascaraDoFundo(luz: Float32Array, w: number, h: number) {
  * @param produto  A máscara do Estúdio: branco onde está o produto. Com ela, fundo é tudo o que está
  *                 fora — e nenhum pixel do produto é tocado. Sem ela, cai na busca pela borda.
  */
+/** Lê um mapa cinza (o fator da rede) para um Float32Array 0..1, reescalado para w×h. */
+function amostrarCinza(src: CanvasImageSource, w: number, h: number): Float32Array {
+  const aux = document.createElement("canvas");
+  aux.width = w; aux.height = h;
+  const actx = aux.getContext("2d", { willReadFrequently: true })!;
+  actx.drawImage(src, 0, 0, w, h);
+  const dados = actx.getImageData(0, 0, w, h).data;
+  const saida = new Float32Array(w * h);
+  for (let i = 0; i < saida.length; i++) saida[i] = dados[i * 4] / 255; // canal vermelho = cinza
+  return saida;
+}
+
 export async function smoothBackdrop(
   input: Blob,
   name: string,
   opts: BackdropOpts = {},
 ): Promise<BackdropResult> {
-  const { sombra, produto, apagar } = opts;
+  const { sombra, produto, apagar, fator: fatorMapa } = opts;
   const transparente = opts.fundo === "transparente";
   const cor = opts.fundo && typeof opts.fundo === "object" ? opts.fundo : { r: 255, g: 255, b: 255 };
   const formato: "png" | "jpeg" | "webp" = transparente ? "png" : (opts.formato ?? "jpeg");
@@ -390,58 +405,60 @@ export async function smoothBackdrop(
     }
   }
 
-  // Quanta luz o fundo teria em cada ponto se a sombra não estivesse lá: média larga tomada só nos
-  // pixels de fundo. É contra ela que a sombra é medida — por isso a sombra não muda de forma.
-  const raio = Math.max(8, Math.round(Math.max(w, h) * RAIO_LUZ));
-  const base = new Float32Array(n);
-  const peso = new Float32Array(n);
-  // Só o fundo CLARO entra na conta da luz: sombra e canto escuro puxariam a referência para baixo
-  // e a sombra sumiria. Onde a média local não tem material suficiente, vale a mediana do quadro.
-  const claros: number[] = [];
-  for (let i = 0; i < n; i += 7) if (marca[i]) claros.push(luz[i]);
-  claros.sort((a, b) => a - b);
-  const luzDoFundo = claros.length ? claros[Math.round((claros.length - 1) * 0.75)] : 255;
-  for (let i = 0; i < n; i++) {
-    const claro = marca[i] && luz[i] > luzDoFundo * 0.82 ? 1 : 0;
-    base[i] = luz[i] * claro;
-    peso[i] = claro;
-  }
-  blurMascarado(base, peso, w, h, raio);
-  for (let i = 0; i < n; i++) if (!(base[i] > 1)) base[i] = luzDoFundo;
-
-  // Onde o branco vale: o fundo achado, mais o traço do pincel (a sombra costuma ser escura demais
-  // para a região alcançar sozinha). A pena tira o degrau na divisa com o produto.
+  // Onde a sombra vale: o fundo achado, mais o traço do pincel (a sombra costuma ser escura demais
+  // para a região alcançar sozinha). A pena tira o degrau na divisa com o produto. Vale nos dois
+  // caminhos — a rede e o analítico só mudam DE ONDE vem o fator, não ONDE ele é aplicado.
   const pena = Math.max(1, Math.round(Math.max(w, h) * PENA));
   const forca = new Float32Array(n);
   const um = new Float32Array(n).fill(1);
   for (let i = 0; i < n; i++) forca[i] = Math.max(suave ? suave[i] : marca[i], pincel ? (pincel[i] > 0.02 ? 1 : 0) : 0);
   if (!suave) blurMascarado(forca, um, w, h, pena); // a máscara do Estúdio já vem com a borda macia
 
-  // Quanto a sombra ainda vale, conforme se afasta do produto.
-  //
-  // Antes isto era uma caixa: a sombra sobrevivia dentro do retângulo do produto com uma folga, e
-  // morria de uma vez na borda dele. Numa sombra longa — sol baixo, luz rasante — o resultado era
-  // a sombra cortada com uma régua, que é pior do que não ter sombra. Agora o produto é borrado
-  // num campo que cai com a distância: perto vale inteira, longe some sozinha, sem nenhuma reta.
-  const vizinhanca = new Float32Array(n);
-  const umV = new Float32Array(n).fill(1);
-  for (let i = 0; i < n; i++) vizinhanca[i] = marca[i] ? 0 : 1;
-  blurMascarado(vizinhanca, umV, w, h, Math.max(4, Math.round(Math.max(w, h) * SOMBRA_ALCANCE)));
-  // A curva: o campo sai forte colado no produto e cai rápido. A raiz abre a meia-luz, para a
-  // sombra não terminar num degrau onde o campo cruza o limiar.
-  for (let i = 0; i < n; i++) vizinhanca[i] = Math.min(1, Math.sqrt(vizinhanca[i] * 2.2));
-
-  // A sombra é decidida num mapa próprio e depois suavizada. Pixel a pixel ela sai granulada e com
-  // bloco quadrado, porque a média larga muda de vizinhança de um pixel para o outro; a sombra de
-  // verdade não tem grão nenhum, e o que interessa dela é a forma.
   const fatores = new Float32Array(n);
   const umTodo = new Float32Array(n).fill(1);
-  for (let i = 0; i < n; i++) {
-    const medido = Math.max(SOMBRA_MIN, Math.min(1, luz[i] / base[i]));
-    const pintado = pincel ? pincel[i] : 0;
-    let f = medido > 1 - RUGA ? 1 : 1 - (1 - medido) * vizinhanca[i];
-    if (pintado > 0.02) f = Math.min(f, 1 - pintado * (1 - medido));
-    fatores[i] = f;
+  if (fatorMapa) {
+    // SHARP: o fator vem da rede treinada, que já dá a forma e a suavidade da sombra. Aqui só
+    // limitamos ao piso (abaixo seria buraco) e deixamos o pincel insistir onde foi pedido.
+    const net = amostrarCinza(fatorMapa, w, h);
+    for (let i = 0; i < n; i++) {
+      const bruto = Math.max(SOMBRA_MIN, Math.min(1, net[i]));
+      let f = net[i] > 1 - RUGA ? 1 : bruto;
+      const pintado = pincel ? pincel[i] : 0;
+      if (pintado > 0.02) f = Math.min(f, 1 - pintado * (1 - bruto));
+      fatores[i] = f;
+    }
+  } else {
+    // Caminho analítico: cada pixel de fundo dividido pela luz que ele teria sem sombra. Só o fundo
+    // CLARO entra na conta da luz; onde a média local não tem material, vale a mediana do quadro.
+    const raio = Math.max(8, Math.round(Math.max(w, h) * RAIO_LUZ));
+    const base = new Float32Array(n);
+    const peso = new Float32Array(n);
+    const claros: number[] = [];
+    for (let i = 0; i < n; i += 7) if (marca[i]) claros.push(luz[i]);
+    claros.sort((a, b) => a - b);
+    const luzDoFundo = claros.length ? claros[Math.round((claros.length - 1) * 0.75)] : 255;
+    for (let i = 0; i < n; i++) {
+      const claro = marca[i] && luz[i] > luzDoFundo * 0.82 ? 1 : 0;
+      base[i] = luz[i] * claro;
+      peso[i] = claro;
+    }
+    blurMascarado(base, peso, w, h, raio);
+    for (let i = 0; i < n; i++) if (!(base[i] > 1)) base[i] = luzDoFundo;
+
+    // A sombra cai com a distância do produto (campo borrado), em vez de ser cortada numa caixa.
+    const vizinhanca = new Float32Array(n);
+    const umV = new Float32Array(n).fill(1);
+    for (let i = 0; i < n; i++) vizinhanca[i] = marca[i] ? 0 : 1;
+    blurMascarado(vizinhanca, umV, w, h, Math.max(4, Math.round(Math.max(w, h) * SOMBRA_ALCANCE)));
+    for (let i = 0; i < n; i++) vizinhanca[i] = Math.min(1, Math.sqrt(vizinhanca[i] * 2.2));
+
+    for (let i = 0; i < n; i++) {
+      const medido = Math.max(SOMBRA_MIN, Math.min(1, luz[i] / base[i]));
+      const pintado = pincel ? pincel[i] : 0;
+      let f = medido > 1 - RUGA ? 1 : 1 - (1 - medido) * vizinhanca[i];
+      if (pintado > 0.02) f = Math.min(f, 1 - pintado * (1 - medido));
+      fatores[i] = f;
+    }
   }
   blurMascarado(fatores, umTodo, w, h, Math.max(2, Math.round(Math.max(w, h) * SUAVE_SOMBRA)));
 
