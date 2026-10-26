@@ -417,12 +417,15 @@ export async function smoothBackdrop(
   const fatores = new Float32Array(n);
   const umTodo = new Float32Array(n).fill(1);
   if (fatorMapa) {
-    // SHARP: o fator vem da rede treinada, que já dá a forma e a suavidade da sombra. Aqui só
-    // limitamos ao piso (abaixo seria buraco) e deixamos o pincel insistir onde foi pedido.
+    // SHARP: o fator vem da rede treinada, que já dá a forma e a suavidade da sombra. A rede roda
+    // em 256 px, então a ampliação deixa degrau: um box blur proporcional tira isso antes de usar.
     const net = amostrarCinza(fatorMapa, w, h);
+    // O blur é sobre o campo da rede ANTES do corte, então a divisa sombra/fundo cruza o limiar num
+    // degradê em vez de num contorno: tira o degrau da ampliação e a borda seca de uma só vez.
+    blurMascarado(net, new Float32Array(n).fill(1), w, h, Math.max(2, Math.round(Math.max(w, h) / 256 * 2)));
     for (let i = 0; i < n; i++) {
       const bruto = Math.max(SOMBRA_MIN, Math.min(1, net[i]));
-      let f = net[i] > 1 - RUGA ? 1 : bruto;
+      let f = net[i] > 1 - RUGA ? 1 : bruto;   // acima de 0,82 é fundo limpo e some
       const pintado = pincel ? pincel[i] : 0;
       if (pintado > 0.02) f = Math.min(f, 1 - pintado * (1 - bruto));
       fatores[i] = f;

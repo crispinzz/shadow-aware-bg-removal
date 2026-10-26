@@ -66,4 +66,5 @@ def prever_fator(bgr: np.ndarray) -> np.ndarray:
     tensor = pequena.transpose(2, 0, 1)[None]
     saida = sessao.run(None, {sessao.get_inputs()[0].name: tensor})[0]
     mapa = np.asarray(saida, dtype=np.float32).squeeze()
-    return cv2.resize(mapa, (largura, altura), interpolation=cv2.INTER_LINEAR)
+    # Cúbica, não linear: a sombra sobe de 256 px para a foto inteira, e a linear deixa degrau.
+    return cv2.resize(mapa, (largura, altura), interpolation=cv2.INTER_CUBIC)
