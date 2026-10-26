@@ -280,6 +280,7 @@ export async function smoothBackdrop(
   sombra?: CanvasImageSource,
   produto?: CanvasImageSource,
   apagar?: CanvasImageSource,
+  transparente?: boolean,
 ): Promise<BackdropResult> {
   const comeco = performance.now();
   const bitmap = await createImageBitmap(input);
@@ -436,20 +437,34 @@ export async function smoothBackdrop(
   for (let i = 0; i < n; i++) {
     const t = forca[i];
     if (t <= 0.002) continue; // produto: byte original, intocado
+    const p = i * 4;
+    if (transparente) {
+      // Produto sobre a sombra sobre o vazio: a sombra vira preto semi-transparente (o xadrez
+      // aparece através dela), o fundo limpo some. Divide pela cobertura para a borda macia do
+      // produto manter a cor em vez de escurecer num halo.
+      const s = 1 - Math.max(SOMBRA_MIN, Math.min(1, fatores[i])); // 0 limpo .. força da sombra
+      const cobre = (1 - t) + t * s;
+      px[p] = cobre > 0 ? Math.round(px[p] * (1 - t) / cobre) : 0;
+      px[p + 1] = cobre > 0 ? Math.round(px[p + 1] * (1 - t) / cobre) : 0;
+      px[p + 2] = cobre > 0 ? Math.round(px[p + 2] * (1 - t) / cobre) : 0;
+      px[p + 3] = Math.round(255 * cobre);
+      continue;
+    }
     // Multiply sobre branco: 1 e branco puro, abaixo de 1 e sombra. A dobra de tecido fica dentro
     // de RUGA e e arredondada para branco; a sombra passa disso e sobrevive inteira.
     const alvo = 255 * Math.max(SOMBRA_MIN, Math.min(1, fatores[i]));
-    const p = i * 4;
     px[p] = Math.round(px[p] * (1 - t) + alvo * t);
     px[p + 1] = Math.round(px[p + 1] * (1 - t) + alvo * t);
     px[p + 2] = Math.round(px[p + 2] * (1 - t) + alvo * t);
   }
 
   ctx.putImageData(imagem, 0, 0);
-  const blob = await new Promise<Blob | null>((ok) => tela.toBlob(ok, "image/jpeg", QUALIDADE));
+  const tipo = transparente ? "image/png" : "image/jpeg";
+  const blob = await new Promise<Blob | null>((ok) => tela.toBlob(ok, tipo, QUALIDADE));
   if (!blob) throw new Error("Não consegui gerar a foto tratada.");
+  const sufixo = transparente ? "-fundo-transparente.png" : "-fundo-branco.jpg";
   return {
-    file: new File([blob], name.replace(/\.\w+$/, "") + "-fundo-branco.jpg", { type: "image/jpeg" }),
+    file: new File([blob], name.replace(/\.\w+$/, "") + sufixo, { type: tipo }),
     cobertura: dentro / n,
     w,
     h,

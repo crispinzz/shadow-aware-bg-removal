@@ -6,7 +6,7 @@
 // produto não são tocadas. A sombra volta sozinha (Multiply) e o pincel serve para insistir nela.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { ArrowLeft, ArrowRight, Brush, Download, Eraser, House, Image as ImageIcon, LogOut, Moon, Radio, Search, Smartphone, Sun, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Brush, Download, Eraser, Grid3x3, House, Image as ImageIcon, LogOut, Moon, Radio, Search, Smartphone, Sun, X } from "lucide-react";
 import { smoothBackdrop } from "../src/backdrop";
 import { arquivoUrl, processar as recortarNoEstudio } from "./studio-client";
 import "./studio.css";
@@ -54,7 +54,7 @@ function Marca() {
 }
 
 /** Antes e depois na mesma moldura, com um divisor que se arrasta. */
-function Cortina({ antes, depois }: { antes: string; depois: string }) {
+function Cortina({ antes, depois, xadrez }: { antes: string; depois: string; xadrez?: boolean }) {
   const caixa = useRef<HTMLDivElement>(null);
   const [corte, setCorte] = useState(50);
   const arrastando = useRef(false);
@@ -74,7 +74,7 @@ function Cortina({ antes, depois }: { antes: string; depois: string }) {
   }, [mover]);
 
   return (
-    <div ref={caixa} className="rt-cortina" onPointerDown={(e) => { arrastando.current = true; mover(e.clientX); }}>
+    <div ref={caixa} className={xadrez ? "rt-cortina rt-cortina--xadrez" : "rt-cortina"} onPointerDown={(e) => { arrastando.current = true; mover(e.clientX); }}>
       <img src={depois} alt="Depois" className="rt-cortina-base" />
       <div className="rt-cortina-topo" style={{ width: `${corte}%` }}>
         <img src={antes} alt="Antes" />
@@ -183,6 +183,11 @@ export default function StudioPage() {
   const [pincel, setPincel] = useState<Modo | null>(null);
   // Os traços ficam guardados: dá para remover um objeto, ver o resultado e ainda pintar a sombra.
   const marcas = useRef<{ sombra?: HTMLCanvasElement; apagar?: HTMLCanvasElement }>({});
+  // Fundo da saída: branco limpo (JPEG) ou transparente (PNG, com a sombra por cima do xadrez). O
+  // ref espelha o estado para o rodar reusar o modo atual sem virar dependência do callback.
+  const [fundo, setFundo] = useState<"branco" | "transparente">("branco");
+  const fundoRef = useRef(fundo);
+  fundoRef.current = fundo;
   // A página também é renderizada no servidor, onde localStorage não existe: começa no claro e
   // corrige no navegador, na primeira pintura.
   const [tema, setTema] = useState<Tema>("claro");
@@ -247,7 +252,7 @@ export default function StudioPage() {
       if (!mascara) throw new Error("O Estúdio terminou sem a máscara do produto.");
       const desenho = await carregarImagem(arquivoUrl(mascara.id));
       setEtapa("Limpando o fundo…");
-      const res = await smoothBackdrop(file, file.name, marcas.current.sombra, desenho, marcas.current.apagar);
+      const res = await smoothBackdrop(file, file.name, marcas.current.sombra, desenho, marcas.current.apagar, fundoRef.current === "transparente");
       setDepois({ url: URL.createObjectURL(res.file), nome: res.file.name, cobertura: res.cobertura, ms: res.ms, w: res.w, h: res.h });
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
@@ -256,6 +261,13 @@ export default function StudioPage() {
       setEtapa("");
     }
   }, []);
+
+  const trocarFundo = () => {
+    const novo = fundo === "branco" ? "transparente" : "branco";
+    setFundo(novo);
+    fundoRef.current = novo;
+    if (original.current) void rodar(original.current, antes?.titulo ?? "");
+  };
 
   const daGaleria = useCallback(async (arquivo: string) => {
     if (!galeria || rodando) return;
@@ -357,12 +369,13 @@ export default function StudioPage() {
         <main className="rt-tela">
           <section className="rt-bloco">
             <header className="rt-bloco-topo">
-              <h2>Fundo branco</h2>
+              <h2>{fundo === "branco" ? "Fundo branco" : "Fundo transparente"}</h2>
               <span>{antes ? antes.titulo : "Escolha uma foto para começar"}</span>
               {depois ? (
                 <div className="rt-bloco-acoes">
                   <button className="rt-botao" onClick={() => setPincel(pincel === "sombra" ? null : "sombra")}><Brush size={15} /> Sombra</button>
                   <button className="rt-botao" onClick={() => setPincel(pincel === "apagar" ? null : "apagar")}><Eraser size={15} /> Remover objeto</button>
+                  <button className="rt-botao" disabled={rodando} onClick={trocarFundo}><Grid3x3 size={15} /> {fundo === "branco" ? "Transparente" : "Fundo branco"}</button>
                   <a className="rt-botao rt-botao--principal" href={depois.url} download={depois.nome}><Download size={15} /> Baixar</a>
                 </div>
               ) : null}
@@ -383,7 +396,7 @@ export default function StudioPage() {
                   }}
                 />
               ) : antes && depois ? (
-                <Cortina antes={antes.url} depois={depois.url} />
+                <Cortina antes={antes.url} depois={depois.url} xadrez={fundo === "transparente"} />
               ) : antes ? (
                 <div className="rt-cortina rt-cortina--so">
                   <img src={antes.url} alt="Antes" className="rt-cortina-base" />
