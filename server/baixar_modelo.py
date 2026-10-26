@@ -25,6 +25,13 @@ MODELOS = {
         "licenca": "MIT — mesma origem do birefnet-general, espinha dorsal Swin-tiny.",
         "origem_pesos": "https://huggingface.co/ZhengPeng7/BiRefNet",
     },
+    # Nossa rede de sombra (U-Net 1,9M, treinada no ISTD). Pesos proprios, nao MIT.
+    "shadow-matte": {
+        "url": "https://github.com/crispinzz/shadow-aware-bg-removal/releases/download/weights-v1/shadow-matte.onnx",
+        "md5": "037e60e5d28840c02224d26b7d2351a5",
+        "licenca": "Proprietaria — todos os direitos reservados (ver LICENSE).",
+        "origem_pesos": "training/train_shadow.py neste repositorio.",
+    },
 }
 
 

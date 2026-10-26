@@ -120,7 +120,8 @@ cd shadow-aware-bg-removal
 
 # segmentation server (Python 3.11+)
 pip install -r server/requirements.txt
-python server/baixar_modelo.py birefnet-general-lite   # 224 MB, once
+python server/baixar_modelo.py birefnet-general-lite   # 224 MB, once (product matte)
+python server/baixar_modelo.py shadow-matte            # 6 MB, once (our shadow weights)
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --app-dir server
 ```
 
