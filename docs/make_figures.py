@@ -10,6 +10,7 @@ It writes four PNGs into docs/figures/, which is exactly what the README shows:
     02-matte.png        the alpha matte from BiRefNet: white is product
     03-shadow-map.png   how much each background pixel darkens the backdrop
     04-output.png       the composite: pure white, product untouched, shadow kept
+    05-cutout.png       transparent RGBA: no backdrop, the shadow kept as semi-transparent black
 
 The maths here mirrors src/backdrop.ts on purpose. The browser does the compositing at
 full resolution; this script exists so the figures in the README are generated, never
@@ -119,6 +120,14 @@ def main(entrada: Path) -> None:
     branco = (255.0 * mapa)[..., None].repeat(3, axis=2)
     saida = bgr.astype(np.float32) * (1 - peso) + branco * peso
     cv2.imwrite(str(SAIDA / "04-output.png"), np.clip(saida, 0, 255).astype(np.uint8))
+
+    # Transparent cutout: product over the kept shadow onto alpha, mirrors the browser's transparent
+    # mode. The shadow becomes semi-transparent black; the clean backdrop goes fully transparent.
+    sombra = 1.0 - mapa[..., None]                               # 0 clean .. shadow strength
+    cobre = (1.0 - peso) + peso * sombra                         # final coverage (alpha)
+    rgb = bgr.astype(np.float32) * (1.0 - peso) / np.maximum(cobre, 1e-6)
+    bgra = np.concatenate([np.clip(rgb, 0, 255), np.clip(cobre * 255.0, 0, 255)], axis=2)
+    cv2.imwrite(str(SAIDA / "05-cutout.png"), bgra.astype(np.uint8))
 
     print(f"figures written to {SAIDA} ({largura}x{altura}, model {mascara.modelo})")
 
