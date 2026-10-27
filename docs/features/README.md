@@ -13,6 +13,7 @@ Um documento por feature. Cada um diz **o que faz**, **onde mora no código** e 
 | 07 | Galeria local | [07-galeria-local.md](07-galeria-local.md) | As fotos tratadas ficam no navegador (IndexedDB) |
 | 08 | Painel de status | [08-painel-de-status.md](08-painel-de-status.md) | Quais modelos estão instalados e rodando |
 | 09 | Câmera do celular | [09-camera-do-celular.md](09-camera-do-celular.md) | Mandar foto do celular por QR (recurso futuro) |
+| 10 | Remoção inteligente | [10-remocao-inteligente.md](10-remocao-inteligente.md) | Lápis mágico: pinta o que tirar, a região some, o produto nunca |
 
 ## A regra que atravessa tudo
 

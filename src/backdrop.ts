@@ -29,6 +29,7 @@ const PENA_PINCEL = 1 / 90;    // borda macia do traço: sombra não tem contorn
 const SUAVE_SOMBRA = 1 / 220; // raio que tira o grão da sombra sem mexer na forma dela
 const ALFA_PRODUTO = 0.22;   // acima disto a mascara ja conta como produto, e nada ali e tocado
 const VIZINHA = 0.04;        // o quanto uma peça pode estar longe da caixa do produto e ainda ser dele
+const MAGICO_PASSO = 12;     // continuidade de luz no flood da remoção inteligente, em 0..255
 
 export interface BackdropOpts {
   sombra?: CanvasImageSource;   // traço do pincel da sombra
@@ -348,19 +349,39 @@ export async function smoothBackdrop(
   let dentro = 0;
   for (let i = 0; i < n; i++) dentro += marca[i];
 
-  // Borracha: o que você pintou aqui vira fundo, doa a mascara o que disser. É assim que sai o
-  // objeto que a rede insiste em chamar de produto — tripé, caixa, pedaço de parede.
+  // Remoção inteligente ("lápis mágico"): você pinta por cima do que quer tirar — uma sombra que
+  // saiu errada, lixo do fundo — e a região CONECTADA dali some. O flood anda por continuidade de
+  // luz (a sombra é um campo suave, então uma passada pega ela inteira) e PARA no produto: a peça é
+  // parede dura, então um traço que escorrega por cima dela não come a peça — foca no que importa.
+  // O que sai vira fundo limpo, sem sombra (o fator é forçado a 1 mais abaixo).
+  const apagado = new Uint8Array(n);
   if (apagar) {
     const aux = document.createElement("canvas");
     aux.width = w; aux.height = h;
     const actx = aux.getContext("2d", { willReadFrequently: true })!;
     actx.drawImage(apagar, 0, 0, w, h);
     const dados = actx.getImageData(0, 0, w, h).data;
+    const ehProduto = (i: number) => (suave ? suave[i] < 0.5 : marca[i] === 0);
+    const pilha = new Int32Array(n);
+    let topo = 0;
     for (let i = 0; i < n; i++) {
-      if (dados[i * 4 + 3] <= 6) continue;
-      marca[i] = 1;
-      if (suave) suave[i] = 1;
+      // Semente: só o traço que caiu FORA do produto. Pincelada em cima da peça é ignorada.
+      if (dados[i * 4 + 3] <= 6 || ehProduto(i) || apagado[i]) continue;
+      apagado[i] = 1;
+      pilha[topo++] = i;
     }
+    while (topo > 0) {
+      const i = pilha[--topo];
+      const x = i % w;
+      const aqui = luz[i];
+      for (const j of [i - w, i + w, x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1]) {
+        if (j < 0 || j >= n || apagado[j] || ehProduto(j)) continue;
+        if (Math.abs(luz[j] - aqui) > MAGICO_PASSO) continue;
+        apagado[j] = 1;
+        pilha[topo++] = j;
+      }
+    }
+    for (let i = 0; i < n; i++) if (apagado[i]) { marca[i] = 1; if (suave) suave[i] = 1; }
   }
 
   // O traço do pincel entra como peso 0..1: a borda macia da ponta vira borda macia da sombra.
@@ -430,6 +451,7 @@ export async function smoothBackdrop(
     fatores[i] = f;
   }
   blurMascarado(fatores, umTodo, w, h, Math.max(2, Math.round(Math.max(w, h) * SUAVE_SOMBRA)));
+  for (let i = 0; i < n; i++) if (apagado[i]) fatores[i] = 1; // removido = fundo limpo, nenhuma sombra
 
   for (let i = 0; i < n; i++) {
     const t = forca[i];

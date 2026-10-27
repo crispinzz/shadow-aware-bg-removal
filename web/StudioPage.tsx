@@ -5,7 +5,7 @@
 // produto não é tocado; a sombra volta sozinha (Multiply) e o pincel serve para insistir nela.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { Brush, Check, Cpu, Download, House, Image as ImageIcon, Moon, Palette, Radio, Search, SlidersHorizontal, Smartphone, Sun, Trash2, X } from "lucide-react";
+import { Brush, Check, Cpu, Download, Eraser, House, Image as ImageIcon, Moon, Palette, Radio, Search, SlidersHorizontal, Smartphone, Sun, Trash2, X } from "lucide-react";
 import { smoothBackdrop, type BackdropOpts } from "../src/backdrop";
 import { arquivoUrl, processar as recortarNoEstudio, saude, type Saude } from "./studio-client";
 import { listarFotos, removerFoto, salvarFoto, type FotoLocal } from "./galeria-local";
@@ -89,11 +89,13 @@ function Cortina({ antes, depois, xadrez }: { antes: string; depois: string; xad
   );
 }
 
-/** Pincel da sombra: pinta por cima da foto onde a sombra está, e o traço entra como máscara. */
-function Pincel({ foto, w, h, aoAplicar, aoCancelar }: {
+/** Pincel: pinta por cima da foto, e o traço entra como máscara. Serve para a sombra (insistir numa
+ *  sombra fraca) e para a remoção inteligente (marcar o que tirar); muda só a cor, o rótulo e a dica. */
+function Pincel({ foto, w, h, aoAplicar, aoCancelar, cor = "rgba(90,90,255,.5)", rotuloAplicar = "Aplicar a sombra", dica = "Pinte por cima da sombra que fica no chão. O resto do fundo some." }: {
   foto: string; w: number; h: number;
   aoAplicar: (trilha: HTMLCanvasElement) => void;
   aoCancelar: () => void;
+  cor?: string; rotuloAplicar?: string; dica?: string;
 }) {
   const tela = useRef<HTMLCanvasElement>(null);
   const pintando = useRef(false);
@@ -109,7 +111,7 @@ function Pincel({ foto, w, h, aoAplicar, aoCancelar }: {
 
   const traco = (de: { x: number; y: number } | null, ate: { x: number; y: number }) => {
     const ctx = tela.current!.getContext("2d")!;
-    ctx.strokeStyle = ctx.fillStyle = "rgba(90,90,255,.5)";
+    ctx.strokeStyle = ctx.fillStyle = cor;
     ctx.lineWidth = grossura;
     ctx.lineCap = ctx.lineJoin = "round";
     if (de) { ctx.beginPath(); ctx.moveTo(de.x, de.y); ctx.lineTo(ate.x, ate.y); ctx.stroke(); }
@@ -153,10 +155,10 @@ function Pincel({ foto, w, h, aoAplicar, aoCancelar }: {
         }}>Limpar</button>
         <button className="rt-botao" onClick={aoCancelar}>Cancelar</button>
         <button className="rt-botao rt-botao--principal" disabled={!pintou} onClick={() => aoAplicar(tela.current!)}>
-          Aplicar a sombra
+          {rotuloAplicar}
         </button>
       </div>
-      <p className="rt-dica">Pinte por cima da sombra que fica no chão. O resto do fundo some.</p>
+      <p className="rt-dica">{dica}</p>
     </div>
   );
 }
@@ -323,8 +325,8 @@ export default function StudioPage() {
   const [pendente, setPendente] = useState<{ file: File; url: string; titulo: string } | null>(null);
   const [antes, setAntes] = useState<{ url: string; titulo: string } | null>(null);
   const [depois, setDepois] = useState<{ url: string; nome: string; cobertura: number; ms: number; w: number; h: number } | null>(null);
-  const [pincel, setPincel] = useState<boolean>(false);
-  const marcas = useRef<{ sombra?: HTMLCanvasElement }>({});
+  const [ferramenta, setFerramenta] = useState<null | "sombra" | "remocao">(null);
+  const marcas = useRef<{ sombra?: HTMLCanvasElement; apagar?: HTMLCanvasElement }>({});
 
   const [fundo, setFundo] = useState<Fundo>("branco");
   const [corHex, setCorHex] = useState("#f2f2f2");
@@ -387,7 +389,7 @@ export default function StudioPage() {
     setPendente({ file, url, titulo });
     setAntes({ url, titulo });
     setDepois(null);
-    setPincel(false);
+    setFerramenta(null);
     setErro(null);
   }, []);
 
@@ -395,7 +397,7 @@ export default function StudioPage() {
     original.current = file;
     setDepois(null);
     setErro(null);
-    setPincel(false);
+    setFerramenta(null);
     setRodando(true);
     setEtapa("O SHARP está achando o produto…");
     try {
@@ -409,7 +411,7 @@ export default function StudioPage() {
       setEtapa("Montando o fundo…");
       const f = fundoRef.current;
       const alvoFundo: BackdropOpts["fundo"] = f === "transparente" ? "transparente" : f === "cor" ? hexParaRgb(corRef.current) : { r: 255, g: 255, b: 255 };
-      const res = await smoothBackdrop(file, file.name, { sombra: marcas.current.sombra, produto: desenho, fundo: alvoFundo, formato: formatoRef.current });
+      const res = await smoothBackdrop(file, file.name, { sombra: marcas.current.sombra, apagar: marcas.current.apagar, produto: desenho, fundo: alvoFundo, formato: formatoRef.current });
       setDepois({ url: URL.createObjectURL(res.file), nome: res.file.name, cobertura: res.cobertura, ms: res.ms, w: res.w, h: res.h });
       const item: FotoLocal = {
         id: crypto.randomUUID(), nome: titulo, ts: Date.now(),
@@ -428,7 +430,7 @@ export default function StudioPage() {
 
   const processar = () => { if (pendente) void rodar(pendente.file, pendente.titulo); };
   const aoEscolher = (file: File) => preparar(file, file.name.replace(/\.\w+$/, ""));
-  const reiniciar = () => { setPendente(null); setAntes(null); setDepois(null); setPincel(false); setErro(null); marcas.current = {}; };
+  const reiniciar = () => { setPendente(null); setAntes(null); setDepois(null); setFerramenta(null); setErro(null); marcas.current = {}; };
 
   useEffect(() => {
     const colar = (e: ClipboardEvent) => {
@@ -478,7 +480,7 @@ export default function StudioPage() {
         <Marca />
         <nav>
           <button className="rt-rail-item is-on" title="Estúdio" onClick={reiniciar}><House size={20} /></button>
-          <button className="rt-rail-item" title="Pincel da sombra" disabled={!depois} onClick={() => setPincel((v) => !v)}><Brush size={20} /></button>
+          <button className="rt-rail-item" title="Pincel da sombra" disabled={!depois} onClick={() => setFerramenta((v) => v === "sombra" ? null : "sombra")}><Brush size={20} /></button>
           <button className="rt-rail-item" title="Minhas fotos" onClick={() => trilho.current?.scrollIntoView({ behavior: "smooth" })}><ImageIcon size={20} /></button>
           <button className="rt-rail-item" title="Câmera do celular (em breve)" disabled={!qr} onClick={() => qr && window.open(qr.url, "_blank")}><Smartphone size={20} /></button>
           <button className="rt-rail-item" title={semServidor ? "Servidor da câmera fora do ar" : "Servidor da câmera no ar"}>
@@ -518,7 +520,8 @@ export default function StudioPage() {
               <span>{antes ? antes.titulo : "Escolha uma foto para começar"}</span>
               {depois ? (
                 <div className="rt-bloco-acoes">
-                  <button className="rt-botao" onClick={() => setPincel((v) => !v)}><Brush size={15} /> Sombra</button>
+                  <button className={ferramenta === "sombra" ? "rt-botao is-on" : "rt-botao"} onClick={() => setFerramenta((v) => v === "sombra" ? null : "sombra")}><Brush size={15} /> Sombra</button>
+                  <button className={ferramenta === "remocao" ? "rt-botao is-on" : "rt-botao"} onClick={() => setFerramenta((v) => v === "remocao" ? null : "remocao")}><Eraser size={15} /> Remoção</button>
                   <button className="rt-botao" onClick={() => setDepois(null)}><SlidersHorizontal size={15} /> Ajustar</button>
                   <a className="rt-botao rt-botao--principal" href={depois.url} download={depois.nome}><Download size={15} /> Baixar</a>
                 </div>
@@ -526,14 +529,23 @@ export default function StudioPage() {
             </header>
 
             <div className="rt-palco">
-              {antes && pincel && depois ? (
+              {antes && ferramenta && depois ? (
                 <Pincel
-                  key="sombra"
+                  key={ferramenta}
                   foto={antes.url}
                   w={depois.w}
                   h={depois.h}
-                  aoCancelar={() => setPincel(false)}
-                  aoAplicar={(trilha) => { marcas.current.sombra = trilha; if (original.current) void rodar(original.current, antes.titulo); }}
+                  cor={ferramenta === "remocao" ? "rgba(255,70,70,.5)" : "rgba(90,90,255,.5)"}
+                  rotuloAplicar={ferramenta === "remocao" ? "Remover o que pintei" : "Aplicar a sombra"}
+                  dica={ferramenta === "remocao"
+                    ? "Pinte por cima do que quer tirar — uma sombra errada, lixo do fundo. Some a região inteira dali; o produto nunca é tocado."
+                    : "Pinte por cima da sombra que fica no chão. O resto do fundo some."}
+                  aoCancelar={() => setFerramenta(null)}
+                  aoAplicar={(trilha) => {
+                    if (ferramenta === "remocao") marcas.current.apagar = trilha;
+                    else marcas.current.sombra = trilha;
+                    if (original.current) void rodar(original.current, antes.titulo);
+                  }}
                 />
               ) : antes && depois ? (
                 <Cortina antes={antes.url} depois={depois.url} xadrez={fundo === "transparente"} />
