@@ -30,6 +30,8 @@ const SUAVE_SOMBRA = 1 / 220; // raio que tira o grão da sombra sem mexer na fo
 const ALFA_PRODUTO = 0.22;   // acima disto a mascara ja conta como produto, e nada ali e tocado
 const SOMBRA_ALCANCE = 0.26; // até onde a sombra ainda vale, em fração do lado maior, caindo macio
 const VIZINHA = 0.04;        // o quanto uma peça pode estar longe da caixa do produto e ainda ser dele
+const LISO = 6;              // MAD da luma do fundo iluminado, em 0..255: abaixo disto é sweep liso
+const SATURACAO_LISA = 12;   // croma médio do fundo acima disto é fundo colorido, não branco/cinza
 
 export interface BackdropOpts {
   sombra?: CanvasImageSource;   // traço do pincel da sombra
@@ -299,6 +301,36 @@ function amostrarCinza(src: CanvasImageSource, w: number, h: number): Float32Arr
   return saida;
 }
 
+/**
+ * O fundo é um sweep liso — o caso-casa do analítico?
+ *
+ * A rede de sombra foi treinada sem o objeto no quadro, então num fundo branco liso ela lê o
+ * produto como sombra e devolve um borrão grande e mole. Nesse fundo o analítico (dividir pela luz
+ * do fundo) já reproduz a sombra REAL, com a forma e a suavidade certas. Então: fundo liso ⇒
+ * analítico; fundo texturizado/colorido ⇒ rede, que é para isso que ela existe.
+ *
+ * Mede só o fundo ILUMINADO (a sombra é escura e fica de fora): o quanto a luma varia (MAD) e o
+ * quanto ele é colorido (croma). Branco/cinza liso dá os dois baixos.
+ */
+function fundoLiso(luz: Float32Array, px: Uint8ClampedArray, marca: Uint8Array, w: number, h: number): boolean {
+  const n = w * h;
+  const claros: number[] = [];
+  for (let i = 0; i < n; i += 7) if (marca[i]) claros.push(luz[i]);
+  if (claros.length < 50) return false;   // quase não há fundo: não dá para confiar no analítico
+  claros.sort((a, b) => a - b);
+  const luzDoFundo = claros[Math.round((claros.length - 1) * 0.75)];
+  let somaAbs = 0, somaCroma = 0, cont = 0;
+  for (let i = 0; i < n; i += 7) {
+    if (!marca[i] || luz[i] <= luzDoFundo * 0.82) continue; // pula a sombra
+    somaAbs += Math.abs(luz[i] - luzDoFundo);
+    const p = i * 4;
+    somaCroma += Math.max(px[p], px[p + 1], px[p + 2]) - Math.min(px[p], px[p + 1], px[p + 2]);
+    cont++;
+  }
+  if (!cont) return false;
+  return somaAbs / cont < LISO && somaCroma / cont < SATURACAO_LISA;
+}
+
 export async function smoothBackdrop(
   input: Blob,
   name: string,
@@ -416,7 +448,9 @@ export async function smoothBackdrop(
 
   const fatores = new Float32Array(n);
   const umTodo = new Float32Array(n).fill(1);
-  if (fatorMapa) {
+  // Fundo liso: a rede borra (foi treinada sem objeto), o analítico dá a sombra real. Só usa a rede
+  // onde o analítico falha — fundo texturizado ou colorido.
+  if (fatorMapa && !fundoLiso(luz, px, marca, w, h)) {
     // SHARP: o fator vem da rede treinada, que já dá a forma e a suavidade da sombra. A rede roda
     // em 256 px, então a ampliação deixa degrau: um box blur proporcional tira isso antes de usar.
     const net = amostrarCinza(fatorMapa, w, h);
