@@ -16,7 +16,7 @@ import cv2
 from ..core import config
 from ..core.trabalhos import Cancelado, Trabalho
 from ..core.trabalhos import fila as fila_padrao
-from . import compor, entrada, exportar, gemini, modelo, refino, sombra_real, sombra_rede
+from . import compor, entrada, exportar, gemini, modelo, refino, sombra_real
 
 
 def _base_do_nome(nome: str) -> str:
@@ -66,17 +66,9 @@ def processar(trabalho: Trabalho, dados: bytes, fila=fila_padrao) -> None:
     caminhos["mascara"] = exportar.gravar_mascara(
         alfa, trabalho.pasta, _base_do_nome(trabalho.nome_original) + "_mascara"
     )
-    # Mapa de fator da sombra pela rede SHARP, quando instalada: quanto cada pixel escureceu o fundo.
-    # O frontend compõe com ele (src/backdrop.ts); sem o peso, a composição cai no analítico.
-    if sombra_rede.pronto():
-        checar_cancelamento()
-        comeco_sombra = time.perf_counter()
-        fator = sombra_rede.prever_fator(foto.bgr)
-        caminhos["fator"] = exportar.gravar_fator(
-            fator, trabalho.pasta, _base_do_nome(trabalho.nome_original) + "_fator"
-        )
-        trabalho.metricas["ms_sombra_rede"] = round((time.perf_counter() - comeco_sombra) * 1000)
-        trabalho.metricas["sombra_rede"] = sombra_rede.NOME
+    # A sombra do estúdio é analítica (src/backdrop.ts): tirada da própria foto, não de um modelo.
+    # A rede SHARP (sombra_rede) fica fora daqui — ela foi treinada sem o objeto no quadro e lê o
+    # produto como sombra. Ver docs/features/06-rede-de-sombra.md.
     for formato, caminho in caminhos.items():
         fila.registrar_saida(
             trabalho,

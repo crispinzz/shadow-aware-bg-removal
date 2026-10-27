@@ -183,9 +183,12 @@ python training/train_shadow.py --data /path/to/ISTD --epochs 40 --batch 8
 python training/export_onnx.py runs/shadow-best.pt server/modelos/shadow-matte.onnx
 ```
 
-Once `shadow-matte.onnx` is in `server/modelos/`, the server runs it on every photo and the shadow
-in the result comes from the network — the model status panel in the studio reads *running*. Without
-the weights, the compositing falls back to the analytic method in `src/backdrop.ts`.
+Heads up: the studio shadow is **analytic** (`src/backdrop.ts`), extracted from the photo itself, and
+the network is **not** wired into it. Trained as it is, the net never saw an object in frame — on a
+product-on-sweep shot it reads the object as shadow and returns a blur — so it stays a training
+artifact until it is retrained with the object composited in. See
+[docs/features/06-rede-de-sombra.md](docs/features/06-rede-de-sombra.md). Per-feature docs live in
+[docs/features/](docs/features/).
 
 The network is a deliberately small U-Net (1.9M parameters). A shadow is a low-frequency field: a
 deep decoder spends its capacity inventing grain that is then multiplied into the photo, where it

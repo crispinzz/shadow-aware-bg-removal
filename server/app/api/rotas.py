@@ -21,11 +21,12 @@ def health() -> dict:
     return {
         "ok": True,
         **pipeline.metadados_do_motor(),
-        # Rede de sombra própria (SHARP). Quando o peso está instalado, o pipeline já devolve o mapa
-        # de fator dela e a composição usa esse mapa (src/backdrop.ts); por isso ativa = pronta.
+        # Rede de sombra própria (SHARP). Fica instalável, mas NÃO entra na composição: o estúdio usa
+        # a sombra analítica (src/backdrop.ts). Ver docs/features/06-rede-de-sombra.md. Por isso ativa
+        # é sempre falso, mesmo com o peso presente.
         "sombra_rede": sombra_rede.NOME,
         "sombra_rede_pronta": sombra_rede.pronto(),
-        "sombra_rede_ativa": sombra_rede.pronto(),
+        "sombra_rede_ativa": False,
         "limites": {
             "max_bytes": config.MAX_BYTES,
             "max_pixels": config.MAX_PIXELS,

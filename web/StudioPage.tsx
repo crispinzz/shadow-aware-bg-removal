@@ -305,11 +305,9 @@ function Status({ s, aberto, aoAlternar }: { s: Saude | null; aberto: boolean; a
             </span>
           </div>
           <div className="rt-pop-linha">
-            <b>Sombra · SHARP</b>
-            <span className="rt-pop-sub">{s?.sombra_rede ?? "shadow-matte"}</span>
-            <span className={s?.sombra_rede_pronta ? "rt-tag rt-tag--on" : "rt-tag rt-tag--off"}>
-              {s?.sombra_rede_pronta ? (s?.sombra_rede_ativa ? "rodando" : "instalado · analítico") : "não instalado"}
-            </span>
+            <b>Sombra · analítica</b>
+            <span className="rt-pop-sub">na própria foto</span>
+            <span className="rt-tag rt-tag--on">ativa</span>
           </div>
         </div>
       ) : null}
@@ -405,13 +403,13 @@ export default function StudioPage() {
       const mascara = trabalho.arquivos.mascara;
       if (!mascara) throw new Error("O Estúdio terminou sem a máscara do produto.");
       const desenho = await carregarImagem(arquivoUrl(mascara.id));
-      // Mapa de fator da rede SHARP, quando o server o devolve: a sombra vem da rede, não do analítico.
-      const arqFator = trabalho.arquivos.fator;
-      const fatorRede = arqFator ? await carregarImagem(arquivoUrl(arqFator.id)) : undefined;
+      // A sombra sai do próprio pixel da foto (analítico, em src/backdrop.ts): nítida e na forma real.
+      // A rede de sombra foi treinada sem o objeto no quadro, então num fundo de estúdio ela lê o
+      // produto como sombra e borra — por isso não entra aqui.
       setEtapa("Montando o fundo…");
       const f = fundoRef.current;
       const alvoFundo: BackdropOpts["fundo"] = f === "transparente" ? "transparente" : f === "cor" ? hexParaRgb(corRef.current) : { r: 255, g: 255, b: 255 };
-      const res = await smoothBackdrop(file, file.name, { sombra: marcas.current.sombra, produto: desenho, fator: fatorRede, fundo: alvoFundo, formato: formatoRef.current });
+      const res = await smoothBackdrop(file, file.name, { sombra: marcas.current.sombra, produto: desenho, fundo: alvoFundo, formato: formatoRef.current });
       setDepois({ url: URL.createObjectURL(res.file), nome: res.file.name, cobertura: res.cobertura, ms: res.ms, w: res.w, h: res.h });
       const item: FotoLocal = {
         id: crypto.randomUUID(), nome: titulo, ts: Date.now(),
