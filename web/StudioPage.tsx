@@ -327,6 +327,12 @@ export default function StudioPage() {
   const [depois, setDepois] = useState<{ url: string; nome: string; cobertura: number; ms: number; w: number; h: number } | null>(null);
   const [ferramenta, setFerramenta] = useState<null | "sombra" | "remocao">(null);
   const marcas = useRef<{ sombra?: HTMLCanvasElement; apagar?: HTMLCanvasElement }>({});
+  // Máscara do produto, guardada após a segmentação: o slider recompõe só a sombra, sem re-rodar o
+  // servidor (que é o passo lento). sombraAlfa é a opacidade da sombra, ao vivo.
+  const produtoRef = useRef<HTMLImageElement | null>(null);
+  const [sombraAlfa, setSombraAlfa] = useState(0.35);
+  const sombraAlfaRef = useRef(sombraAlfa); sombraAlfaRef.current = sombraAlfa;
+  const recomporRef = useRef({ busy: false, pendente: false });
 
   const [fundo, setFundo] = useState<Fundo>("branco");
   const [corHex, setCorHex] = useState("#f2f2f2");
@@ -405,13 +411,14 @@ export default function StudioPage() {
       const mascara = trabalho.arquivos.mascara;
       if (!mascara) throw new Error("O Estúdio terminou sem a máscara do produto.");
       const desenho = await carregarImagem(arquivoUrl(mascara.id));
+      produtoRef.current = desenho; // guarda a máscara para o slider recompor sem o servidor
       // A sombra sai do próprio pixel da foto (analítico, em src/backdrop.ts): nítida e na forma real.
       // A rede de sombra foi treinada sem o objeto no quadro, então num fundo de estúdio ela lê o
       // produto como sombra e borra — por isso não entra aqui.
       setEtapa("Montando o fundo…");
       const f = fundoRef.current;
       const alvoFundo: BackdropOpts["fundo"] = f === "transparente" ? "transparente" : f === "cor" ? hexParaRgb(corRef.current) : { r: 255, g: 255, b: 255 };
-      const res = await smoothBackdrop(file, file.name, { sombra: marcas.current.sombra, apagar: marcas.current.apagar, produto: desenho, fundo: alvoFundo, formato: formatoRef.current });
+      const res = await smoothBackdrop(file, file.name, { sombra: marcas.current.sombra, apagar: marcas.current.apagar, produto: desenho, fundo: alvoFundo, formato: formatoRef.current, sombraOpacidade: sombraAlfaRef.current });
       setDepois({ url: URL.createObjectURL(res.file), nome: res.file.name, cobertura: res.cobertura, ms: res.ms, w: res.w, h: res.h });
       const item: FotoLocal = {
         id: crypto.randomUUID(), nome: titulo, ts: Date.now(),
@@ -427,6 +434,30 @@ export default function StudioPage() {
       setEtapa("");
     }
   }, [recarregarLocal]);
+
+  // Recompõe só a sombra com a opacidade atual, reusando a máscara já segmentada — sem servidor, ao
+  // vivo. Se chegar mudança durante uma recomposição, roda de novo com o último valor ao terminar.
+  const recompor = useCallback(async () => {
+    const st = recomporRef.current;
+    const file = original.current;
+    if (!file || !produtoRef.current) return;
+    if (st.busy) { st.pendente = true; return; }
+    st.busy = true;
+    try {
+      do {
+        st.pendente = false;
+        const f = fundoRef.current;
+        const alvoFundo: BackdropOpts["fundo"] = f === "transparente" ? "transparente" : f === "cor" ? hexParaRgb(corRef.current) : { r: 255, g: 255, b: 255 };
+        const res = await smoothBackdrop(file, file.name, { sombra: marcas.current.sombra, apagar: marcas.current.apagar, produto: produtoRef.current, fundo: alvoFundo, formato: formatoRef.current, sombraOpacidade: sombraAlfaRef.current });
+        setDepois((prev) => {
+          if (prev) URL.revokeObjectURL(prev.url);
+          return { url: URL.createObjectURL(res.file), nome: res.file.name, cobertura: res.cobertura, ms: res.ms, w: res.w, h: res.h };
+        });
+      } while (st.pendente);
+    } catch { /* mantém o anterior */ } finally { st.busy = false; }
+  }, []);
+
+  const aoMudarSombra = (v: number) => { sombraAlfaRef.current = v; setSombraAlfa(v); void recompor(); };
 
   const processar = () => { if (pendente) void rodar(pendente.file, pendente.titulo); };
   const aoEscolher = (file: File) => preparar(file, file.name.replace(/\.\w+$/, ""));
@@ -522,6 +553,10 @@ export default function StudioPage() {
                 <div className="rt-bloco-acoes">
                   <button className={ferramenta === "sombra" ? "rt-botao is-on" : "rt-botao"} onClick={() => setFerramenta((v) => v === "sombra" ? null : "sombra")}><Brush size={15} /> Sombra</button>
                   <button className={ferramenta === "remocao" ? "rt-botao is-on" : "rt-botao"} onClick={() => setFerramenta((v) => v === "remocao" ? null : "remocao")}><Eraser size={15} /> Remoção</button>
+                  <label className="rt-sombra-ctrl" title="Opacidade da sombra">
+                    Sombra
+                    <input type="range" min={0} max={1} step={0.01} value={sombraAlfa} onChange={(e) => aoMudarSombra(Number(e.target.value))} aria-label="Opacidade da sombra" />
+                  </label>
                   <button className="rt-botao" onClick={() => setDepois(null)}><SlidersHorizontal size={15} /> Ajustar</button>
                   <a className="rt-botao rt-botao--principal" href={depois.url} download={depois.nome}><Download size={15} /> Baixar</a>
                 </div>

@@ -20,9 +20,11 @@ sobre o vazio em vez de sobre branco:
   num halo.
 - O alfa do PNG é `255 · cobre`.
 
-## Opacidade da sombra
-No PNG a sombra é um **tingimento que se vê através**, não um bloco preto: a opacidade é capada em
-`SOMBRA_ALFA_MAX` (`src/backdrop.ts`). Suba para uma sombra mais forte, baixe para mais discreta.
+## Opacidade da sombra (slider ao vivo)
+No PNG a sombra é um **tingimento que se vê através**, não um bloco preto. Depois de gerar, um slider
+**Sombra** no cabeçalho controla a opacidade **em tempo real**: ele recompõe só com `smoothBackdrop`
+(`opts.sombraOpacidade`, 0..1), reusando a máscara já segmentada — **sem re-rodar o servidor**, que é
+o passo lento. `SOMBRA_ALFA_MAX` é só o valor padrão quando nada é passado.
 
 ## Regra que não pode quebrar
 A sombra nunca cai por cima do próprio produto (`sombra[forte] = 0`). Transparente **exporta sempre

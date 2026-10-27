@@ -40,6 +40,9 @@ export interface BackdropOpts {
   fundo?: "transparente" | { r: number; g: number; b: number };
   /** Formato do arquivo quando o fundo é sólido. Transparente é sempre PNG. */
   formato?: "png" | "jpeg" | "webp";
+  /** Opacidade da sombra, 0..1: 0 some, 1 é a densidade medida cheia. Escala a sombra em todos os
+   *  modos, então o slider do estúdio recompõe só com isto, sem re-rodar a segmentação. */
+  sombraOpacidade?: number;
 }
 
 export interface BackdropResult {
@@ -291,6 +294,7 @@ export async function smoothBackdrop(
   opts: BackdropOpts = {},
 ): Promise<BackdropResult> {
   const { sombra, produto, apagar } = opts;
+  const op = Math.max(0, Math.min(1, opts.sombraOpacidade ?? SOMBRA_ALFA_MAX)); // opacidade da sombra
   const transparente = opts.fundo === "transparente";
   const cor = opts.fundo && typeof opts.fundo === "object" ? opts.fundo : { r: 255, g: 255, b: 255 };
   const formato: "png" | "jpeg" | "webp" = transparente ? "png" : (opts.formato ?? "jpeg");
@@ -461,9 +465,9 @@ export async function smoothBackdrop(
     if (transparente) {
       // Produto sobre a sombra sobre o vazio: a sombra vira preto semi-transparente (o xadrez
       // aparece através dela), o fundo limpo some. Divide pela cobertura para a borda macia do
-      // produto manter a cor em vez de escurecer num halo. A opacidade da sombra é capada em
-      // SOMBRA_ALFA_MAX: no PNG ela é um tingimento que se vê através, não um bloco preto.
-      const s = Math.min(SOMBRA_ALFA_MAX, 1 - Math.max(SOMBRA_MIN, Math.min(1, fatores[i]))); // 0 limpo .. força
+      // produto manter a cor em vez de escurecer num halo. `op` é a opacidade da sombra (o slider):
+      // no PNG ela é um tingimento que se vê através, não um bloco preto.
+      const s = op * (1 - Math.max(SOMBRA_MIN, Math.min(1, fatores[i]))); // 0 limpo .. força da sombra
       const cobre = (1 - t) + t * s;
       px[p] = cobre > 0 ? Math.round(px[p] * (1 - t) / cobre) : 0;
       px[p + 1] = cobre > 0 ? Math.round(px[p + 1] * (1 - t) / cobre) : 0;
@@ -473,7 +477,8 @@ export async function smoothBackdrop(
     }
     // Multiply sobre a cor escolhida: fator 1 é a cor pura, abaixo de 1 é sombra. A dobra de tecido
     // fica dentro de RUGA e é arredondada para a cor; a sombra passa disso e sobrevive inteira.
-    const f = Math.max(SOMBRA_MIN, Math.min(1, fatores[i]));
+    // `op` (o slider) escala a sombra na direção da cor pura: op 0 some, op 1 é a densidade medida.
+    const f = 1 - op * (1 - Math.max(SOMBRA_MIN, Math.min(1, fatores[i])));
     px[p] = Math.round(px[p] * (1 - t) + cor.r * f * t);
     px[p + 1] = Math.round(px[p + 1] * (1 - t) + cor.g * f * t);
     px[p + 2] = Math.round(px[p + 2] * (1 - t) + cor.b * f * t);

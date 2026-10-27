@@ -355,6 +355,9 @@
 .rt-range input { width: 170px; accent-color: var(--rt-destaque); }
 .rt-barra .rt-botao--principal { margin-left: auto; }
 .rt-dica { margin: 0 2px; color: var(--rt-fraca); font-size: 12.5px; }
+/* Slider da opacidade da sombra, ao vivo, ao lado das ações do resultado. */
+.rt-sombra-ctrl { display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; height: 36px; border-radius: 10px; border: 1px solid var(--rt-linha); color: var(--rt-fraca); font-size: 12.5px; white-space: nowrap; }
+.rt-sombra-ctrl input[type="range"] { width: 92px; accent-color: var(--rt-destaque); }
 
 /* ------------------------------------------------------------------ arrastar */
 .rt-solte {
