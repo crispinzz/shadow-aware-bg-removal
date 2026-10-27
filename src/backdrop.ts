@@ -23,6 +23,7 @@ const RAIO_LUZ = 1 / 22;     // raio da leitura da luz do fundo, em fração do 
 const PENA = 1 / 400;        // borda da máscara borrada, para o fundo encontrar o produto sem degrau
 const QUALIDADE = 0.95;
 const SOMBRA_MIN = 0.35;     // a sombra não escurece além disto: abaixo seria buraco, não sombra
+const SOMBRA_ALFA_MAX = 0.5; // no PNG transparente a sombra é um tingimento: nunca passa desta opacidade
 const RUGA = 0.18;           // ate 18% mais escuro que o fundo liso e dobra de tecido, e vira branco
 const PENA_MASCARA = 1 / 500;  // pena da silhueta: a máscara vem de uma foto menor e sobe em degrau
 const PENA_PINCEL = 1 / 90;    // borda macia do traço: sombra não tem contorno de caneta
@@ -460,8 +461,9 @@ export async function smoothBackdrop(
     if (transparente) {
       // Produto sobre a sombra sobre o vazio: a sombra vira preto semi-transparente (o xadrez
       // aparece através dela), o fundo limpo some. Divide pela cobertura para a borda macia do
-      // produto manter a cor em vez de escurecer num halo.
-      const s = 1 - Math.max(SOMBRA_MIN, Math.min(1, fatores[i])); // 0 limpo .. força da sombra
+      // produto manter a cor em vez de escurecer num halo. A opacidade da sombra é capada em
+      // SOMBRA_ALFA_MAX: no PNG ela é um tingimento que se vê através, não um bloco preto.
+      const s = Math.min(SOMBRA_ALFA_MAX, 1 - Math.max(SOMBRA_MIN, Math.min(1, fatores[i]))); // 0 limpo .. força
       const cobre = (1 - t) + t * s;
       px[p] = cobre > 0 ? Math.round(px[p] * (1 - t) / cobre) : 0;
       px[p + 1] = cobre > 0 ? Math.round(px[p + 1] * (1 - t) / cobre) : 0;

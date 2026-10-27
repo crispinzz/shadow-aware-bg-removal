@@ -20,6 +20,10 @@ sobre o vazio em vez de sobre branco:
   num halo.
 - O alfa do PNG é `255 · cobre`.
 
+## Opacidade da sombra
+No PNG a sombra é um **tingimento que se vê através**, não um bloco preto: a opacidade é capada em
+`SOMBRA_ALFA_MAX` (`src/backdrop.ts`). Suba para uma sombra mais forte, baixe para mais discreta.
+
 ## Regra que não pode quebrar
 A sombra nunca cai por cima do próprio produto (`sombra[forte] = 0`). Transparente **exporta sempre
 em PNG** — JPG não tem canal alfa.

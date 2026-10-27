@@ -7,7 +7,9 @@ texturizado ou colorido, onde o analítico não separa a sombra sozinho, é o ca
 
 ## Onde mora
 - UI: `web/StudioPage.tsx` — botão **Remoção** (ícone borracha); reusa o componente `Pincel` com
-  cor vermelha e outro rótulo. O traço vira `marcas.current.apagar`.
+  cor vermelha e outro rótulo. O traço vira `marcas.current.apagar`. Você pinta por cima do
+  **resultado gerado** (o Depois, com o xadrez atrás no modo transparente), não da foto original,
+  para selecionar exatamente o que sai.
 - Lógica: `src/backdrop.ts` — flood a partir do traço (`opts.apagar`), constante `MAGICO_PASSO`.
 
 ## Como funciona

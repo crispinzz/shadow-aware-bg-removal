@@ -91,11 +91,11 @@ function Cortina({ antes, depois, xadrez }: { antes: string; depois: string; xad
 
 /** Pincel: pinta por cima da foto, e o traço entra como máscara. Serve para a sombra (insistir numa
  *  sombra fraca) e para a remoção inteligente (marcar o que tirar); muda só a cor, o rótulo e a dica. */
-function Pincel({ foto, w, h, aoAplicar, aoCancelar, cor = "rgba(90,90,255,.5)", rotuloAplicar = "Aplicar a sombra", dica = "Pinte por cima da sombra que fica no chão. O resto do fundo some." }: {
+function Pincel({ foto, w, h, aoAplicar, aoCancelar, cor = "rgba(90,90,255,.5)", rotuloAplicar = "Aplicar a sombra", dica = "Pinte por cima da sombra que fica no chão. O resto do fundo some.", xadrez = false }: {
   foto: string; w: number; h: number;
   aoAplicar: (trilha: HTMLCanvasElement) => void;
   aoCancelar: () => void;
-  cor?: string; rotuloAplicar?: string; dica?: string;
+  cor?: string; rotuloAplicar?: string; dica?: string; xadrez?: boolean;
 }) {
   const tela = useRef<HTMLCanvasElement>(null);
   const pintando = useRef(false);
@@ -121,8 +121,8 @@ function Pincel({ foto, w, h, aoAplicar, aoCancelar, cor = "rgba(90,90,255,.5)",
 
   return (
     <div className="rt-pincel">
-      <div className="rt-pincel-palco">
-        <img src={foto} alt="Foto original" />
+      <div className={xadrez ? "rt-pincel-palco rt-pincel-palco--xadrez" : "rt-pincel-palco"}>
+        <img src={foto} alt="Foto para selecionar" />
         <canvas
           ref={tela}
           width={w}
@@ -532,7 +532,8 @@ export default function StudioPage() {
               {antes && ferramenta && depois ? (
                 <Pincel
                   key={ferramenta}
-                  foto={antes.url}
+                  foto={ferramenta === "remocao" ? depois.url : antes.url}
+                  xadrez={ferramenta === "remocao" && fundo === "transparente"}
                   w={depois.w}
                   h={depois.h}
                   cor={ferramenta === "remocao" ? "rgba(255,70,70,.5)" : "rgba(90,90,255,.5)"}
